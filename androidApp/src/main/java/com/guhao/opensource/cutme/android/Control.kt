@@ -66,6 +66,7 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.guhao.opensource.cutme.millisTimeFormat
 import kotlinx.coroutines.launch
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.absoluteValue
@@ -286,6 +287,7 @@ suspend fun PointerInputScope.transformGestures(
         } while (!canceled && event.changes.any { it.pressed })
     }
 }
+
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
@@ -371,7 +373,14 @@ fun Control(
 
             item {
                 TextButton(onClick = {
+                    val currentSet = HashSet(stateSet)
+                    coroutineScope.launch {
+                        currentSet.forEach {
+                            it.animateScrollToItem(0)
+                        }
+                    }
                     onTracksChange(tracks + listOf(Track(listOf(Piece(model = null, duration = 2000)))))
+
                 }) {
                     Text(text = stringResource(id = R.string.addTrack))
                 }
