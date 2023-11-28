@@ -7,12 +7,12 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.media3.common.MediaItem
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableFloatStateOf
@@ -44,11 +43,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -151,11 +148,27 @@ fun Track(
     longestDuration: Long
 ) {
 
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+
+
+    /**
+     * Every piece will have a calculated width for it. 
+     */
+    var trackLength = 0
     val piece2Width = HashMap<Piece, Int>().apply {
-        track.pieces.forEach {
-            this[it] = (LocalConfiguration.current.screenWidthDp * (it.duration / longestDuration.toFloat())).toInt()
+        track.pieces.forEach { piece ->
+            (screenWidthDp * (piece.duration / longestDuration.toFloat())).toInt().let {
+                this[piece] = it
+                trackLength += it
+            }
         }
     }
+
+    /**
+     * I need to fill the last place with exact value
+     */
+    val endPadding = screenWidthDp - trackLength
+    
 
     LazyRow(
         state = state,
@@ -201,6 +214,9 @@ fun Track(
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
             }
 
+        }
+        item { 
+            Spacer(modifier = Modifier.width(endPadding.dp))
         }
     }
 }
