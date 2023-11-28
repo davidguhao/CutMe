@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -283,7 +284,6 @@ fun Control(
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = modifier.pointerInput(Unit) {
-
         detectTransformGestures(
             onGesture = { _, pan, gestureZoom, _ ->
                 zoom *= gestureZoom
@@ -295,7 +295,7 @@ fun Control(
             }
         )
     }) {
-        LazyColumn {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(items = tracks) { track ->
                 val state = rememberLazyListState().also {
                     stateSet.add(it)
