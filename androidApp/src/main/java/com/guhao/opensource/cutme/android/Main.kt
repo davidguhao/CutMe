@@ -146,17 +146,14 @@ fun Track(
 
     zoom: Float = 1f,
 
-    state: LazyListState
+    state: LazyListState,
+
+    longestDuration: Long
 ) {
 
     val piece2Width = HashMap<Piece, Int>().apply {
-        var sum = 0L
         track.pieces.forEach {
-            sum += it.duration
-        }
-
-        track.pieces.forEach {
-            this[it] = (LocalConfiguration.current.screenWidthDp * (it.duration / sum.toFloat())).toInt()
+            this[it] = (LocalConfiguration.current.screenWidthDp * (it.duration / longestDuration.toFloat())).toInt()
         }
     }
 
@@ -285,6 +282,20 @@ fun Control(
                     stateSet.add(it)
                 }
 
+                val longestDuration = let {
+                    var res = 0L
+                    tracks.forEach { t ->
+                        var sum = 0L
+                        t.pieces.forEach { p ->
+                            sum += p.duration
+                        }
+                        res = res.coerceAtLeast(sum)
+                    }
+                    res
+                }
+
+
+
                 Track(
                     track = track,
                     onTrackChange = { it: Track ->
@@ -299,7 +310,8 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
-                    state = state
+                    state = state,
+                    longestDuration = longestDuration
                 )
             }
 
