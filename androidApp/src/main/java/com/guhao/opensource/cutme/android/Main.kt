@@ -7,6 +7,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.media3.common.MediaItem
 import androidx.compose.foundation.layout.Column
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -33,12 +36,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -130,7 +136,9 @@ fun Track(
     selectedSet: Set<Piece>,
     onSelectedSetChange: (Set<Piece>) -> Unit,
 
-    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
+    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
+
+    zoom: Float = 1f,
 ) {
 
     val piece2Width = HashMap<Piece, Int>().apply {
@@ -143,14 +151,18 @@ fun Track(
             this[it] = (LocalConfiguration.current.screenWidthDp * (it.duration / sum.toFloat())).toInt()
         }
     }
-    LazyRow(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 10.dp)) {
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+    ) {
         items(track.pieces) { piece ->
 
             val selected = selectedSet.contains(piece)
 
             Piece(
+                zoom = zoom,
                 piece = piece,
                 width = piece2Width[piece]!!.dp,
                 selected = selected,
@@ -194,6 +206,8 @@ fun Piece(
     selected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+
+    zoom: Float = 1f
 ) {
     Box {
         Card(
@@ -205,7 +219,7 @@ fun Piece(
                     modifier = Modifier
                         .alpha(if (selected) 0.5f else 1f)
                         .height(70.dp)
-                        .width(width)
+                        .width(width * zoom)
                         .combinedClickable(
                             onClick = onClick,
                             onLongClick = onLongClick
@@ -238,7 +252,15 @@ fun Control(
     var selectedSet by remember { mutableStateOf(setOf<Piece>()) }
     val selectionMode = selectedSet.isNotEmpty()
 
-    Box(modifier = modifier) {
+    var zoom by remember { mutableFloatStateOf(1f) }
+    Box(modifier = modifier.pointerInput(Unit) {
+        detectTransformGestures(
+            onGesture = { _, _, gestureZoom, _ ->
+                zoom *= gestureZoom
+                if(zoom < 1) zoom = 1f
+            }
+        )
+    }) {
         LazyColumn {
             items(items = tracks) { track ->
                 Track(
@@ -252,7 +274,9 @@ fun Control(
                     selectedSet = selectedSet,
                     onSelectedSetChange = { selectedSet = it },
 
-                    requestAdding = requestAdding
+                    requestAdding = requestAdding,
+
+                    zoom = zoom,
                 )
             }
 
