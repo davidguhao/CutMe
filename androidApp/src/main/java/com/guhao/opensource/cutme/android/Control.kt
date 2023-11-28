@@ -18,7 +18,6 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -97,6 +96,7 @@ fun Track(
     piecesListState: LazyListState,
 
     longestDuration: Long,
+
 ) {
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -104,10 +104,10 @@ fun Track(
     /**
      * Every piece will have a calculated width for it.
      */
-    var trackLength = 0
+    var trackLength = 0f
     val piece2Width = HashMap<Piece, Int>().apply {
         track.pieces.forEach { piece ->
-            (screenWidthDp * (piece.duration / longestDuration.toFloat())).toInt().let {
+            (screenWidthDp * (piece.duration / longestDuration.toFloat())).roundToInt().let {
                 this[piece] = it
                 trackLength += it
             }
@@ -117,7 +117,7 @@ fun Track(
     /**
      * I need to fill the last place with exact value
      */
-    val padding = (screenWidthDp - trackLength) * zoom - 10
+    val padding = screenWidthDp * zoom - trackLength * zoom
 
     LazyRow(
         state = piecesListState,
@@ -151,7 +151,10 @@ fun Track(
         item {
             IconButton(
                 modifier = Modifier
-                    .padding(start = 10.dp, top = 10.dp, bottom = 10.dp),
+                    .padding(
+                        start = 10.dp,
+                        top = 10.dp,
+                        bottom = 10.dp),
                 onClick = {
                     requestAdding.invoke { result: List<SelectInfo> ->
                         onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
@@ -181,8 +184,10 @@ fun Piece(
     zoom: Float = 1f,
     offset: Offset = Offset.Zero
 ) {
+    val actualWidth = width * zoom
+    val actionable = actualWidth > 30.dp
+
     Box(modifier = Modifier.offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
-        val actualWidth = width * zoom
         Card(
             shape = RoundedCornerShape(0.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
@@ -194,8 +199,12 @@ fun Piece(
                         .height(70.dp)
                         .width(actualWidth)
                         .combinedClickable(
-                            onClick = onClick,
-                            onLongClick = onLongClick
+                            onClick = {
+                                if (actionable) onClick.invoke()
+                            },
+                            onLongClick = {
+                                if (actionable) onLongClick.invoke()
+                            }
                         ),
                     contentScale = ContentScale.Crop,
                     model = piece.model,
@@ -207,7 +216,7 @@ fun Piece(
 
         Column(modifier = Modifier.align(Alignment.Center)) {
 
-            AnimatedVisibility(visible = actualWidth > 30.dp) {
+            AnimatedVisibility(visible = actionable) {
                 Text(text = piece.duration.millisTimeFormat())
             }
             AnimatedVisibility(visible = selected) {
@@ -301,17 +310,12 @@ fun Control(
                 zoom *= gestureZoom
                 if(zoom < 1) zoom = 1f
 
-
                 if(pan.x.absoluteValue > 0) {
-                    var calculatedOnce = false
                     stateSet.forEach {
                         coroutineScope.launch {
                             it.scrollBy(-pan.x).let { consumed ->
-                                if (calculatedOnce) return@let
-
                                 val direction = -pan.x > 0 // true -> / false <-
                                 currentScrollOffset += (if (direction) 1 else -1) * consumed
-                                calculatedOnce = true
                             }
                         }
                     }
@@ -332,9 +336,6 @@ fun Control(
             items(items = tracks) { track ->
                 val state = rememberLazyListState().also {
                     stateSet.add(it)
-                    coroutineScope.launch {
-                        it.animateScrollBy(currentScrollOffset)
-                    }
                 }
 
                 val longestDuration = let {
@@ -348,8 +349,6 @@ fun Control(
                     }
                     res
                 }
-
-
 
                 Track(
                     track = track,
