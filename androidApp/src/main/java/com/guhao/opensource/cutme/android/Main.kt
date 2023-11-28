@@ -7,7 +7,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.media3.common.MediaItem
 import androidx.compose.foundation.layout.Column
@@ -34,12 +36,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -59,6 +64,7 @@ import androidx.media3.ui.PlayerView
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.guhao.opensource.cutme.millisTimeFormat
+import kotlinx.coroutines.launch
 
 class MainViewModel: ViewModel() {
     val tracks = MutableLiveData(listOf<Track>())
@@ -139,6 +145,8 @@ fun Track(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
 
     zoom: Float = 1f,
+
+    state: LazyListState
 ) {
 
     val piece2Width = HashMap<Piece, Int>().apply {
@@ -153,6 +161,8 @@ fun Track(
     }
 
     LazyRow(
+        state = state,
+        userScrollEnabled = false,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 10.dp)
@@ -252,17 +262,29 @@ fun Control(
     var selectedSet by remember { mutableStateOf(setOf<Piece>()) }
     val selectionMode = selectedSet.isNotEmpty()
 
+    val stateSet = remember { HashSet<LazyListState>() }
     var zoom by remember { mutableFloatStateOf(1f) }
+    val coroutineScope = rememberCoroutineScope()
+
     Box(modifier = modifier.pointerInput(Unit) {
+
         detectTransformGestures(
-            onGesture = { _, _, gestureZoom, _ ->
+            onGesture = { _, pan, gestureZoom, _ ->
                 zoom *= gestureZoom
                 if(zoom < 1) zoom = 1f
+
+                stateSet.forEach {
+                    coroutineScope.launch { it.scrollBy(-pan.x) }
+                }
             }
         )
     }) {
         LazyColumn {
             items(items = tracks) { track ->
+                val state = rememberLazyListState().also {
+                    stateSet.add(it)
+                }
+
                 Track(
                     track = track,
                     onTrackChange = { it: Track ->
@@ -277,6 +299,7 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
+                    state = state
                 )
             }
 
