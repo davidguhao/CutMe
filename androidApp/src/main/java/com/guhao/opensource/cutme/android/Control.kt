@@ -313,14 +313,13 @@ fun Control(
                 if(zoom < 1) zoom = 1f
 
                 if(pan.x.absoluteValue > 0) {
-                    stateSet.forEach {
-                        coroutineScope.launch {
-                            it.scrollBy(-pan.x).let { consumed ->
-                                val direction = -pan.x > 0 // true -> / false <-
-                                currentScrollOffset += (if (direction) 1 else -1) * consumed
-                            }
+                    coroutineScope.launch {
+                        stateSet.forEach {
+                            val scrollValue = -pan.x
+                            it.scrollBy(scrollValue)
                         }
                     }
+
                 }
                 if(pan.y.absoluteValue > 0) {
                     coroutineScope.launch {
@@ -336,9 +335,7 @@ fun Control(
             state = globalVerticalState,
             modifier = Modifier.fillMaxSize()) {
             items(items = tracks) { track ->
-                val state = rememberLazyListState().also {
-                    stateSet.add(it)
-                }
+                val state = rememberLazyListState().also { stateSet.add(it) }
 
                 val longestDuration = let {
                     var res = 0L
@@ -373,14 +370,7 @@ fun Control(
 
             item {
                 TextButton(onClick = {
-                    val currentSet = HashSet(stateSet)
-                    coroutineScope.launch {
-                        currentSet.forEach {
-                            it.animateScrollToItem(0)
-                        }
-                    }
                     onTracksChange(tracks + listOf(Track(listOf(Piece(model = null, duration = 2000)))))
-
                 }) {
                     Text(text = stringResource(id = R.string.addTrack))
                 }
