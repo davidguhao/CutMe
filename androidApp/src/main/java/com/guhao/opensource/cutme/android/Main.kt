@@ -150,7 +150,6 @@ fun Track(
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
 
-
     /**
      * Every piece will have a calculated width for it. 
      */
@@ -233,6 +232,7 @@ fun Piece(
     zoom: Float = 1f
 ) {
     Box {
+        val actualWidth = width * zoom
         Card(
             shape = RoundedCornerShape(0.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
@@ -242,7 +242,7 @@ fun Piece(
                     modifier = Modifier
                         .alpha(if (selected) 0.5f else 1f)
                         .height(70.dp)
-                        .width(width * zoom)
+                        .width(actualWidth)
                         .combinedClickable(
                             onClick = onClick,
                             onLongClick = onLongClick
@@ -256,7 +256,10 @@ fun Piece(
 
 
         Column(modifier = Modifier.align(Alignment.Center)) {
-            Text(text = piece.duration.millisTimeFormat())
+
+            AnimatedVisibility(visible = actualWidth > 30.dp) {
+                Text(text = piece.duration.millisTimeFormat())
+            }
             AnimatedVisibility(visible = selected) {
                 Icon(imageVector = Icons.Default.Done, contentDescription = "Selected")
             }
