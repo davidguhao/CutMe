@@ -4,9 +4,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -14,9 +14,11 @@ import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,10 +27,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -46,12 +46,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,11 +65,8 @@ import androidx.compose.ui.unit.dp
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.guhao.opensource.cutme.millisTimeFormat
-import kotlinx.coroutines.launch
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 
@@ -94,8 +91,6 @@ fun Track(
 
     zoom: Float = 1f,
 
-    piecesListState: LazyListState,
-
     longestDuration: Long,
 
 ) {
@@ -114,23 +109,16 @@ fun Track(
             }
         }
     }
-
-    /**
-     * I need to fill the last place with exact value
-     */
-    val padding = screenWidthDp * zoom - trackLength * zoom
-
-    LazyRow(
-        state = piecesListState,
-        userScrollEnabled = false,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 10.dp)
     ) {
-        items(track.pieces) { piece ->
+        Spacer(modifier = Modifier.width((screenWidthDp / 2).dp))
+
+        track.pieces.forEach { piece ->
 
             val selected = selectedSet.contains(piece)
-
             Piece(
                 zoom = zoom,
                 piece = piece,
@@ -149,25 +137,23 @@ fun Track(
             )
 
         }
-        item {
-            IconButton(
-                modifier = Modifier
-                    .padding(
-                        start = 10.dp,
-                        top = 10.dp,
-                        bottom = 10.dp),
-                onClick = {
-                    requestAdding.invoke { result: List<SelectInfo> ->
-                        onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
-                    }
+        IconButton(
+            modifier = Modifier
+                .padding(
+                    start = 10.dp,
+                    top = 10.dp,
+                    bottom = 10.dp),
+            onClick = {
+                requestAdding.invoke { result: List<SelectInfo> ->
+                    onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
                 }
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
             }
+        ) {
+            Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
         }
-        item {
-            Spacer(modifier = Modifier.width(padding.dp))
-        }
+
+        Spacer(modifier = Modifier.width((screenWidthDp / 2 - 58).dp))
+
     }
 }
 
@@ -218,7 +204,9 @@ fun Piece(
         Column(modifier = Modifier.align(Alignment.Center)) {
 
             AnimatedVisibility(visible = actionable) {
-                Text(text = piece.duration.millisTimeFormat())
+                Text(
+                    text = piece.duration.millisTimeFormat(),
+                    color = Color.White)
             }
             AnimatedVisibility(visible = selected) {
                 Icon(imageVector = Icons.Default.Done, contentDescription = "Selected")
@@ -240,7 +228,7 @@ suspend fun PointerInputScope.transformGestures(
         val touchSlop = viewConfiguration.touchSlop
         var lockedToPanZoom = false
 
-        awaitFirstDown(requireUnconsumed = false)
+        awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = true)
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val canceled = event.changes.any { it.isConsumed }
@@ -277,11 +265,11 @@ suspend fun PointerInputScope.transformGestures(
                     ) {
                         onGesture(centroid, panChange, zoomChange, effectiveRotation)
                     }
-                    event.changes.forEach {
-                        if (it.positionChanged()) {
-                            it.consume()
-                        }
-                    }
+//                    event.changes.forEach {
+//                        if (it.positionChanged()) {
+//                            it.consume()
+//                        }
+//                    }
                 }
             }
         } while (!canceled && event.changes.any { it.pressed })
@@ -299,44 +287,23 @@ fun Control(
     var selectedSet by remember { mutableStateOf(setOf<Piece>()) }
     val selectionMode = selectedSet.isNotEmpty()
 
-    val stateSet = remember { HashSet<LazyListState>() }
     var zoom by remember { mutableFloatStateOf(1f) }
-    val coroutineScope = rememberCoroutineScope()
 
-    var currentScrollOffset by remember { mutableFloatStateOf(0f) }
-
-    val globalVerticalState = rememberLazyListState()
     Box(modifier = modifier.pointerInput(Unit) {
         transformGestures(
             onGesture = { _, pan, gestureZoom, _ ->
                 zoom *= gestureZoom
                 if(zoom < 1) zoom = 1f
-
-                if(pan.x.absoluteValue > 0) {
-                    coroutineScope.launch {
-                        stateSet.forEach {
-                            val scrollValue = -pan.x
-                            it.scrollBy(scrollValue)
-                        }
-                    }
-
-                }
-                if(pan.y.absoluteValue > 0) {
-                    coroutineScope.launch {
-                        globalVerticalState.scrollBy(-pan.y)
-                    }
-                }
-
             }
         )
 
     }) {
+        val horizontalScrollState = rememberScrollState()
         LazyColumn(
-            state = globalVerticalState,
-            modifier = Modifier.fillMaxSize()) {
+            modifier = Modifier
+                .fillMaxSize()
+                .horizontalScroll(horizontalScrollState)) {
             items(items = tracks) { track ->
-                val state = rememberLazyListState().also { stateSet.add(it) }
-
                 val longestDuration = let {
                     var res = 0L
                     tracks.forEach { t ->
@@ -363,20 +330,29 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
-                    piecesListState = state,
                     longestDuration = longestDuration,
                 )
             }
 
             item {
-                TextButton(onClick = {
-                    onTracksChange(tracks + listOf(Track(listOf(Piece(model = null, duration = 2000)))))
-                }) {
+                TextButton(
+                    onClick = {
+                        onTracksChange(tracks + listOf(Track(listOf())))
+                    }) {
                     Text(text = stringResource(id = R.string.addTrack))
                 }
             }
         }
 
+        val screenHeightPixel = LocalConfiguration.current.let {
+            it.screenHeightDp * it.densityDpi
+        }
+        Canvas(modifier = Modifier.align(Alignment.TopCenter)) {
+            drawLine(
+                color = Color.White,
+                start = Offset(x = 0f, y = 0f),
+                end = Offset(x = 0f, y = screenHeightPixel.toFloat()),)
+        }
         AnimatedVisibility(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

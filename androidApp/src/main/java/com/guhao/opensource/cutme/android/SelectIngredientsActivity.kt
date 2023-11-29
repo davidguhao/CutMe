@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment.Companion.BottomCenter
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -142,38 +143,6 @@ class SelectInfo(
     val duration: Long? = null // In milli seconds
 ): Serializable
 
-@Composable
-fun NumberInCircle(
-    modifier: Modifier = Modifier,
-    number: Int,
-) {
-    Box(modifier = modifier) {
-        val circleColor = MaterialTheme.colorScheme.background
-        val fontFamilyResolver = LocalFontFamilyResolver.current
-        val density = LocalDensity.current
-        val layoutDirection = LocalLayoutDirection.current
-
-
-        val radius = LocalView.current.width / 10f
-        Canvas(modifier = modifier) {
-            drawCircle(
-                color = circleColor,
-                radius = radius,
-                center = center
-            )
-            drawText(textMeasurer = TextMeasurer(
-                fallbackDensity = density,
-                fallbackFontFamilyResolver = fontFamilyResolver,
-                fallbackLayoutDirection = layoutDirection,
-                cacheSize = 0,
-            ), text = number.toString())
-        }
-        Text(
-            text = number.toString(),
-            color = MaterialTheme.colorScheme.onBackground)
-    }
-
-}
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun Select(
@@ -223,7 +192,7 @@ fun Select(
                                 currentInfo.duration?.let {
                                     Text(
                                         text = it.millisTimeFormat(),
-                                        color = MaterialTheme.colorScheme.background)
+                                        color = Color.White)
                                 }
 
                                 AnimatedVisibility(
@@ -233,7 +202,7 @@ fun Select(
                                         modifier = Modifier.padding(1.dp),
                                         text = (selectedList.indexOf(currentInfo) + 1).toString(),
                                         textDecoration = TextDecoration.Underline,
-                                        color = MaterialTheme.colorScheme.onBackground)
+                                        color = Color.White)
                                 }
                             }
 
