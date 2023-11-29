@@ -32,53 +32,73 @@ import androidx.lifecycle.ViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
     val tracks = MutableLiveData(listOf<Track>())
-
     fun onTracksChange(new: List<Track>) {
         tracks.value = new
     }
 
     var requestAdding: ((List<SelectInfo>) -> Unit) -> Unit = { throw UnsupportedOperationException() }
 }
+
+
+@Composable
+fun DragPad(
+    modifier: Modifier,
+
+    targetHeight: () -> Int,
+    onTargetHeightChange: (Int) -> Unit)
+{
+    val density = LocalDensity.current.density
+    val draggingIcon = Icons.Default.Menu
+    val draggingIconHeight = 48 // dp
+    var dragging by remember { mutableStateOf(false) }
+    val screenHeight = LocalConfiguration.current.screenHeightDp
+
+    Icon(
+        imageVector = draggingIcon,
+        contentDescription = "Dragger",
+        tint = if(dragging) Color.White else Color.Black,
+        modifier = modifier
+            .padding(vertical = 10.dp)
+            .graphicsLayer(scaleX = 3f)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                        val current = targetHeight.invoke() + (dragAmount.y / density).roundToInt()
+                        if (current <= screenHeight - draggingIconHeight) {
+                            onTargetHeightChange(current)
+                        }
+                    },
+                    onDragStart = {
+                        dragging = true
+                    },
+                    onDragCancel = {
+                        dragging = false
+                    },
+                    onDragEnd = {
+                        dragging = false
+                    }
+                )
+            }
+    )
+}
 @Composable
 fun Main(vm: MainViewModel = MainViewModel()) {
     val screenHeight = LocalConfiguration.current.screenHeightDp
     var videoHeight by remember { mutableIntStateOf(screenHeight / 2) }
-
     Column {
-        VideoScreen(modifier = Modifier.height(videoHeight.dp), mediaItem = null)
+        VideoScreen(
+            modifier = Modifier.height(videoHeight.dp),
+            mediaItem = null)
 
-        val density = LocalDensity.current.density
-        val draggingIcon = Icons.Default.Menu
-        val draggingIconHeight = draggingIcon.viewportHeight / density
-        var dragging by remember { mutableStateOf(false) }
-        Icon(
-            imageVector = draggingIcon,
-            contentDescription = "Dragger",
-            tint = if(dragging) Color.White else Color.Black,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 10.dp)
-                .graphicsLayer(scaleX = 3f)
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDrag = { change: PointerInputChange, dragAmount: Offset ->
-                            var current = videoHeight
-                            current += (dragAmount.y / density).toInt()
-                            if(current <= screenHeight - draggingIconHeight)  videoHeight = current
-                        },
-                        onDragStart = {
-                            dragging = true
-                        },
-                        onDragCancel = {
-                            dragging = false
-                        },
-                        onDragEnd = {
-                            dragging = false
-                        }
-                    )
-                }
-        )
+        DragPad(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            targetHeight = { videoHeight },
+            onTargetHeightChange = { videoHeight = it })
+
         val tracks by vm.tracks.observeAsState(listOf())
 
         Control(
