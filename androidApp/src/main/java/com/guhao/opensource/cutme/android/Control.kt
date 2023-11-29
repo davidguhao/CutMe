@@ -18,6 +18,8 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -212,7 +215,9 @@ fun Piece(
                     color = Color.White)
             }
             AnimatedVisibility(visible = selected) {
-                Icon(imageVector = Icons.Default.Done, contentDescription = "Selected")
+                Icon(
+                    tint = Color.White,
+                    imageVector = Icons.Default.Done, contentDescription = "Selected")
             }
         }
     }
@@ -279,6 +284,7 @@ suspend fun PointerInputScope.transformGestures(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
@@ -356,29 +362,44 @@ fun Control(
                 start = Offset(x = 0f, y = 0f),
                 end = Offset(x = 0f, y = screenHeightPixel.toFloat()),)
         }
-        AnimatedVisibility(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(30.dp),
-            enter = scaleIn(),
-            exit = scaleOut(),
-            visible = selectionMode) {
-            FloatingActionButton(onClick = {
-                onTracksChange(ArrayList<Track>().apply {
-                    tracks.forEach { track ->
-                        val newPieces = track.pieces.filter { piece ->
-                            !selectedSet.contains(piece)
-                        }
 
-                        if(newPieces.isNotEmpty()) add(Track(newPieces))
-                    }
-                })
-                selectedSet = setOf()
-            },
-                shape = RoundedCornerShape(20.dp)
+        FlowRow(modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(30.dp)) {
+            AnimatedVisibility(
+                visible = selectionMode
             ) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete")
+                IconButton(onClick = {
+                    onTracksChange(ArrayList<Track>().apply {
+                        tracks.forEach { track ->
+                            val newPieces = track.pieces.filter { piece ->
+                                !selectedSet.contains(piece)
+                            }
+
+                            if(newPieces.isNotEmpty()) add(Track(newPieces))
+                        }
+                    })
+                    selectedSet = setOf()
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.White)
+                }
             }
+
+            val cutAvailable = selectionMode && selectedSet.size == 1
+            AnimatedVisibility(
+                visible = cutAvailable) {
+                IconButton(onClick = { /*TODO*/ }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
+                        tint = Color.White,
+                        contentDescription = "cut")
+                }
+            }
+            
         }
+        
     }
 }
