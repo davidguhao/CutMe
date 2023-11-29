@@ -17,8 +17,13 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -44,14 +49,10 @@ import androidx.compose.ui.Alignment.Companion.BottomCenter
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFontFamilyResolver
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.drawText
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -62,6 +63,7 @@ import com.guhao.opensource.cutme.millisTimeFormat
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
 import java.io.Serializable
+import kotlin.math.min
 
 class SelectIngredientsActivity: ComponentActivity() {
     private fun requestPermission(): Boolean {
@@ -143,6 +145,14 @@ class SelectInfo(
     val duration: Long? = null // In milli seconds
 ): Serializable
 
+val contentScale = object: ContentScale {
+    override fun computeScaleFactor(
+        srcSize: Size,
+        dstSize: Size
+    ): ScaleFactor {
+        return (dstSize.width / srcSize.width).let { ScaleFactor(it, it) }
+    }
+}
 @OptIn(ExperimentalGlideComposeApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun Select(
@@ -153,7 +163,7 @@ fun Select(
         var selectedList by remember { mutableStateOf(listOf<SelectInfo>()) }
         val selectionMode = selectedList.isNotEmpty()
 
-        LazyVerticalStaggeredGrid(columns = StaggeredGridCells.Fixed(count = 3)) {
+        LazyVerticalStaggeredGrid(columns = StaggeredGridCells.Adaptive(100.dp)) {
             items(list) { currentInfo ->
                 Box {
                     Card(
@@ -170,7 +180,6 @@ fun Select(
                                 selectedList + listOf(currentInfo)
                         }
                         Box(modifier = Modifier
-                            .fillMaxSize()
                             .combinedClickable(
                                 onClick = {
                                     if (selectionMode) {
@@ -181,10 +190,11 @@ fun Select(
                                     multiSelectedAction()
                                 }
                             )) {
-                            AnimatedContent(targetState = selected, label = "selected") {
+                            AnimatedContent(targetState = selected, label = "selected") { it ->
                                 GlideImage(
-                                    modifier = Modifier.alpha(if(it) 0.5f else 1f),
+                                    modifier = Modifier.alpha(if(it) 0.5f else 1f).widthIn(min = 90.dp).heightIn(max = 300.dp),
                                     model = currentInfo.path,
+                                    contentScale = contentScale,
                                     contentDescription = "")
                             }
 

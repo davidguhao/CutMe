@@ -147,9 +147,12 @@ fun Track(
                 requestAdding.invoke { result: List<SelectInfo> ->
                     onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
                 }
-            }
+            },
         ) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add",
+                tint = Color.White)
         }
 
         Spacer(modifier = Modifier.width((screenWidthDp / 2 - 58).dp))
