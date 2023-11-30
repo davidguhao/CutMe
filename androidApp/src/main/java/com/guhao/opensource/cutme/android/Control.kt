@@ -3,8 +3,12 @@ package com.guhao.opensource.cutme.android
 import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -52,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -413,10 +418,11 @@ fun Piece(
 
         Card(
             shape = RoundedCornerShape(0.dp),
+            border = if(actionable) null else BorderStroke(0.dp, color = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
         ) {
             AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                val nFrameShouldShow = (width.value / 40).toInt().let { if(it == 0) 1 else it}
+                val nFrameShouldShow = (actualWidth.value / 40).toInt().let { if(it == 0) 1 else it}
 
                 Row(modifier = Modifier
                     .alpha(if (halfAlpha) 0.3f else 1f)
@@ -449,9 +455,13 @@ fun Piece(
 
 
         Column(modifier = Modifier.align(Alignment.Center)) {
-
-            AnimatedVisibility(visible = actionable) {
-                Card(colors = CardDefaults.cardColors(containerColor = Color.Black)) {
+            AnimatedVisibility(
+                enter = fadeIn(), exit = fadeOut(),
+                visible = actionable) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.Black),
+                    modifier = Modifier.alpha(0.9f)
+                ) {
                     Text(
                         text = piece.duration.millisTimeFormat(),
                         color = Color.White)
