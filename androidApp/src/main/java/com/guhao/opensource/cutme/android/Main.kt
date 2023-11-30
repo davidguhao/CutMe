@@ -35,7 +35,7 @@ import androidx.media3.ui.PlayerView
 import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
-    val tracks = MutableLiveData(listOf<Track>())
+    val tracks = MutableLiveData(listOf<Track>(Track(listOf())))
     fun onTracksChange(new: List<Track>) {
         tracks.value = new
     }
@@ -99,7 +99,7 @@ fun Main(vm: MainViewModel = MainViewModel()) {
             targetHeight = { videoHeight },
             onTargetHeightChange = { videoHeight = it })
 
-        val tracks by vm.tracks.observeAsState(listOf())
+        val tracks by vm.tracks.observeAsState(listOf(Track(listOf())))
 
         Control(
             modifier = Modifier.fillMaxHeight(),

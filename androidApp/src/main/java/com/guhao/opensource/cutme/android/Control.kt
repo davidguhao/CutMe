@@ -419,7 +419,7 @@ fun Piece(
                 val nFrameShouldShow = (width.value / 40).toInt().let { if(it == 0) 1 else it}
 
                 Row(modifier = Modifier
-                    .alpha(if (halfAlpha) 0.5f else 1f)
+                    .alpha(if (halfAlpha) 0.3f else 1f)
                     .combinedClickable(
                         onClick = {
                             if (actionable) onClick.invoke()
@@ -451,14 +451,12 @@ fun Piece(
         Column(modifier = Modifier.align(Alignment.Center)) {
 
             AnimatedVisibility(visible = actionable) {
-                Text(
-                    text = piece.duration.millisTimeFormat(),
-                    color = Color.White)
-            }
-            AnimatedVisibility(visible = selected) {
-                Icon(
-                    tint = Color.White,
-                    imageVector = Icons.Default.Done, contentDescription = "Selected")
+                Card(colors = CardDefaults.cardColors(containerColor = Color.Black)) {
+                    Text(
+                        text = piece.duration.millisTimeFormat(),
+                        color = Color.White)
+                }
+
             }
         }
     }
@@ -570,7 +568,9 @@ fun Control(
                     track = track,
                     onTrackChange = { it: Track ->
                         onTracksChange.invoke(ArrayList(tracks).apply {
-                            this[indexOf(track)] = it
+                            val index = indexOf(track)
+                            this[index] = it
+                            if(index == lastIndex) add(Track(listOf()))
                         })
                     },
 
@@ -590,15 +590,6 @@ fun Control(
                     },
                     longestDuration = longestDuration,
                 )
-            }
-
-            item {
-                TextButton(
-                    onClick = {
-                        onTracksChange(tracks + listOf(Track(listOf())))
-                    }) {
-                    Text(text = stringResource(id = R.string.addTrack))
-                }
             }
         }
 
@@ -625,7 +616,7 @@ fun Control(
                                 !selectedSet.contains(piece)
                             }
 
-                            if(newPieces.isNotEmpty()) add(Track(newPieces))
+                            if(newPieces.isNotEmpty() || tracks.size == 1) add(Track(newPieces))
                         }
                     })
                     selectedSet = setOf()
