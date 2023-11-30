@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,7 +105,6 @@ fun Track(
     invalidateZoom: () -> Unit,
 
     longestDuration: Long,
-
     ) {
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -243,7 +243,6 @@ suspend fun AwaitPointerEventScope.awaitLongPressOrCancellationMine(
 }
 
 
-
 suspend inline fun AwaitPointerEventScope.awaitDragOrUpMine(
     pointerId: PointerId,
     hasDragged: (PointerInputChange) -> Boolean
@@ -347,10 +346,11 @@ fun Piece(
     var offset by remember { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.zIndex(if(offset != Offset.Zero) 1f else 0f)
+    Box(modifier = Modifier
+        .zIndex(if (offset != Offset.Zero) 1f else 0f)
         .pointerInput(Unit) {
             dragGesturesAfterLongPress(
-                onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                onDrag = { _: PointerInputChange, dragAmount: Offset ->
                     offset += dragAmount
                 },
                 onDragStart = {
@@ -361,28 +361,48 @@ fun Piece(
                 onDragEnd = {
                     dragging = false
 
-                    ValueAnimator.ofFloat(offset.x, 0f).apply {
-                        duration = 250
-                        addUpdateListener { offset = offset.copy(x = it.animatedValue as Float) }
-                    }.start()
-                    ValueAnimator.ofFloat(offset.y, 0f).apply {
-                        duration = 250
-                        addUpdateListener { offset = offset.copy(y = it.animatedValue as Float) }
-                    }.start()
+                    ValueAnimator
+                        .ofFloat(offset.x, 0f)
+                        .apply {
+                            duration = 250
+                            addUpdateListener {
+                                offset = offset.copy(x = it.animatedValue as Float)
+                            }
+                        }
+                        .start()
+                    ValueAnimator
+                        .ofFloat(offset.y, 0f)
+                        .apply {
+                            duration = 250
+                            addUpdateListener {
+                                offset = offset.copy(y = it.animatedValue as Float)
+                            }
+                        }
+                        .start()
 
                     onDragEnd.invoke()
                 },
                 onDragCancel = {
                     dragging = false
 
-                    ValueAnimator.ofFloat(offset.x, 0f).apply {
-                        duration = 250
-                        addUpdateListener { offset = offset.copy(x = it.animatedValue as Float) }
-                    }.start()
-                    ValueAnimator.ofFloat(offset.y, 0f).apply {
-                        duration = 250
-                        addUpdateListener { offset = offset.copy(y = it.animatedValue as Float) }
-                    }.start()
+                    ValueAnimator
+                        .ofFloat(offset.x, 0f)
+                        .apply {
+                            duration = 250
+                            addUpdateListener {
+                                offset = offset.copy(x = it.animatedValue as Float)
+                            }
+                        }
+                        .start()
+                    ValueAnimator
+                        .ofFloat(offset.y, 0f)
+                        .apply {
+                            duration = 250
+                            addUpdateListener {
+                                offset = offset.copy(y = it.animatedValue as Float)
+                            }
+                        }
+                        .start()
 
 
                     onDragCancel.invoke()
@@ -390,12 +410,16 @@ fun Piece(
             )
         }
         .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
+
         Card(
             shape = RoundedCornerShape(0.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
         ) {
             AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                Row(modifier = Modifier.alpha(if (halfAlpha) 0.5f else 1f)
+                val nFrameShouldShow = (width.value / 40).toInt().let { if(it == 0) 1 else it}
+
+                Row(modifier = Modifier
+                    .alpha(if (halfAlpha) 0.5f else 1f)
                     .combinedClickable(
                         onClick = {
                             if (actionable) onClick.invoke()
@@ -404,15 +428,16 @@ fun Piece(
                             if (actionable) onLongClick.invoke()
                         }
                     )) {
-                    GlideImage(
+                    for(i in 0 until nFrameShouldShow) GlideImage(
                         modifier = Modifier
                             .height(70.dp)
-                            .width(actualWidth),
+                            .width(actualWidth / nFrameShouldShow),
                         contentScale = ContentScale.Crop,
                         model = piece.model,
                         contentDescription = "",
-                        requestBuilderTransform = { it.also {
-                            it.frame(0)
+                        requestBuilderTransform = { it.apply {
+
+                            frame(piece.duration / nFrameShouldShow * i * 1000)
                         }}
                     )
 
@@ -516,7 +541,7 @@ fun Control(
 
     Box(modifier = modifier.pointerInput(Unit) {
         transformGestures(
-            onGesture = { _, pan, gestureZoom, _ ->
+            onGesture = { _, _, gestureZoom, _ ->
                 zoom *= gestureZoom
                 if(zoom < 1) zoom = 1f
             }
@@ -558,7 +583,9 @@ fun Control(
                     invalidateZoom = {
                         ValueAnimator.ofFloat(zoom, 1f).apply {
                             duration = 1000
-                            addUpdateListener { zoom = it.animatedValue as Float }
+                            addUpdateListener {
+                                zoom = it.animatedValue as Float
+                            }
                         }.start()
                     },
                     longestDuration = longestDuration,
