@@ -1,23 +1,23 @@
 package com.guhao.opensource.cutme
 
 fun Long.millisTimeFormat(): String {
-    val secs = this / 1000
+    val secsInTotal = this / 1000
 
-    if(secs < 60) return "$secs s"
+    if(secsInTotal < 60) return "$secsInTotal s"
     else {
-        val mins = secs / 60
-        val secs = secs % 60
+        val minutes = secsInTotal / 60
+        val secs = secsInTotal % 60
 
-        if(mins < 60) {
-            return "$mins:$secs"
+        return if(minutes < 60) {
+            "$minutes:$secs"
         } else {
             val hours = secs / 360
 
             if(hours < 24) {
-                return "$hours h"
+                "$hours h"
             } else {
                 val days = secs / (360 * 24)
-                return "$days d"
+                "$days d"
             }
         }
     }

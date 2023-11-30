@@ -1,9 +1,8 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -14,7 +13,6 @@ import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +36,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -54,10 +51,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -65,9 +71,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.guhao.opensource.cutme.millisTimeFormat
+import kotlinx.coroutines.CancellationException
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -93,10 +101,11 @@ fun Track(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
 
     zoom: Float = 1f,
+    invalidateZoom: () -> Unit,
 
     longestDuration: Long,
 
-) {
+    ) {
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
 
@@ -137,6 +146,13 @@ fun Track(
                 onLongClick = {
                     onSelectedSetChange(setOf())
                 },
+                onDragStart = {
+                    invalidateZoom.invoke()
+                },
+                onDragEnd = {
+                },
+                onDragCancel = {
+                }
             )
 
         }
@@ -164,6 +180,152 @@ fun Track(
 }
 
 
+fun PointerEvent.isPointerUp(pointerId: PointerId): Boolean =
+    changes.firstOrNull { it.id == pointerId }?.pressed != true
+suspend fun AwaitPointerEventScope.awaitLongPressOrCancellationMine(
+    pointerId: PointerId
+): PointerInputChange? {
+    if (currentEvent.isPointerUp(pointerId)) {
+        return null // The pointer has already been lifted, so the long press is cancelled.
+    }
+
+    val initialDown =
+        currentEvent.changes.firstOrNull { it.id == pointerId } ?: return null
+
+    var longPress: PointerInputChange? = null
+    var currentDown = initialDown
+    val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+    return try {
+        // wait for first tap up or long press
+        withTimeout(longPressTimeout) {
+            var finished = false
+            while (!finished) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.all { it.changedToUpIgnoreConsumed() }) {
+                    // All pointers are up
+                    finished = true
+                }
+
+                if (
+                    event.changes.any {
+                        it.isConsumed || it.isOutOfBounds(size, extendedTouchPadding)
+                    }
+                ) {
+                    finished = true // Canceled
+                }
+
+                // Check for cancel by position consumption. We can look on the Final pass of
+                // the existing pointer event because it comes after the Main pass we checked
+                // above.
+                val consumeCheck = awaitPointerEvent(PointerEventPass.Final)
+                if (consumeCheck.changes.any { it.isConsumed }) {
+                    finished = true
+                }
+                if (event.isPointerUp(currentDown.id)) {
+                    val newPressed = event.changes.firstOrNull { it.pressed }
+                    if (newPressed != null) {
+                        currentDown = newPressed
+                        longPress = currentDown
+                    } else {
+                        // should technically never happen as we checked it above
+                        finished = true
+                    }
+                    // Pointer (id) stayed down.
+                } else {
+                    longPress = event.changes.firstOrNull { it.id == currentDown.id }
+                }
+            }
+        }
+        null
+    } catch (_: PointerEventTimeoutCancellationException) {
+        longPress ?: initialDown
+    }
+}
+
+
+
+suspend inline fun AwaitPointerEventScope.awaitDragOrUpMine(
+    pointerId: PointerId,
+    hasDragged: (PointerInputChange) -> Boolean
+): PointerInputChange? {
+    var pointer = pointerId
+    while (true) {
+        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+        val dragEvent = event.changes.firstOrNull { it.id == pointer } ?: return null
+        if (dragEvent.changedToUpIgnoreConsumed()) {
+            val otherDown = event.changes.firstOrNull { it.pressed }
+            if (otherDown == null) {
+                // This is the last "up"
+                return dragEvent
+            } else {
+                pointer = otherDown.id
+            }
+        } else if (hasDragged(dragEvent)) {
+            return dragEvent
+        }
+    }
+}
+suspend fun AwaitPointerEventScope.awaitDragOrCancellationMine(
+    pointerId: PointerId,
+): PointerInputChange? {
+    if (currentEvent.isPointerUp(pointerId)) {
+        return null // The pointer has already been lifted, so the gesture is canceled
+    }
+    val change = awaitDragOrUpMine(pointerId) { it.positionChangedIgnoreConsumed() }
+    return if (change?.isConsumed == false) change else null
+}
+
+suspend fun AwaitPointerEventScope.dragMine(
+    pointerId: PointerId,
+    onDrag: (PointerInputChange) -> Unit
+): Boolean {
+    var pointer = pointerId
+    while (true) {
+        val change = awaitDragOrCancellationMine(pointer) ?: return false
+
+        if (change.changedToUpIgnoreConsumed()) {
+            return true
+        }
+
+        onDrag(change)
+        pointer = change.id
+    }
+}
+
+suspend fun PointerInputScope.dragGesturesAfterLongPress(
+    onDragStart: (Offset) -> Unit = { },
+    onDragEnd: () -> Unit = { },
+    onDragCancel: () -> Unit = { },
+    onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit
+) {
+    awaitEachGesture {
+        try {
+            val down = awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Initial)
+            val drag = awaitLongPressOrCancellationMine(down.id)
+            if (drag != null) {
+                onDragStart.invoke(drag.position)
+
+                if (
+                    dragMine(drag.id) {
+                        onDrag(it, it.positionChange())
+                        it.consume()
+                    }
+                ) {
+                    // consume up if we quit drag gracefully with the up
+                    currentEvent.changes.forEach {
+                        if (it.changedToUp()) it.consume()
+                    }
+                    onDragEnd()
+                } else {
+                    onDragCancel()
+                }
+            }
+        } catch (c: CancellationException) {
+            onDragCancel()
+            throw c
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
@@ -173,35 +335,89 @@ fun Piece(
     selected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDragStart: () -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
 
     zoom: Float = 1f,
-    offset: Offset = Offset.Zero
 ) {
     val actualWidth = width * zoom
     val actionable = actualWidth > 30.dp
 
-    Box(modifier = Modifier.offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var dragging by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.zIndex(if(offset != Offset.Zero) 1f else 0f)
+        .pointerInput(Unit) {
+            dragGesturesAfterLongPress(
+                onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                    offset += dragAmount
+                },
+                onDragStart = {
+                    dragging = true
+
+                    onDragStart.invoke()
+                },
+                onDragEnd = {
+                    dragging = false
+
+                    ValueAnimator.ofFloat(offset.x, 0f).apply {
+                        duration = 250
+                        addUpdateListener { offset = offset.copy(x = it.animatedValue as Float) }
+                    }.start()
+                    ValueAnimator.ofFloat(offset.y, 0f).apply {
+                        duration = 250
+                        addUpdateListener { offset = offset.copy(y = it.animatedValue as Float) }
+                    }.start()
+
+                    onDragEnd.invoke()
+                },
+                onDragCancel = {
+                    dragging = false
+
+                    ValueAnimator.ofFloat(offset.x, 0f).apply {
+                        duration = 250
+                        addUpdateListener { offset = offset.copy(x = it.animatedValue as Float) }
+                    }.start()
+                    ValueAnimator.ofFloat(offset.y, 0f).apply {
+                        duration = 250
+                        addUpdateListener { offset = offset.copy(y = it.animatedValue as Float) }
+                    }.start()
+
+
+                    onDragCancel.invoke()
+                }
+            )
+        }
+        .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
         Card(
             shape = RoundedCornerShape(0.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
         ) {
-            AnimatedContent(targetState = selected, label = "") { selected ->
-                GlideImage(
-                    modifier = Modifier
-                        .alpha(if (selected) 0.5f else 1f)
-                        .height(70.dp)
-                        .width(actualWidth)
-                        .combinedClickable(
-                            onClick = {
-                                if (actionable) onClick.invoke()
-                            },
-                            onLongClick = {
-                                if (actionable) onLongClick.invoke()
-                            }
-                        ),
-                    contentScale = ContentScale.Crop,
-                    model = piece.model,
-                    contentDescription = "")
+            AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
+                Row(modifier = Modifier.alpha(if (halfAlpha) 0.5f else 1f)
+                    .combinedClickable(
+                        onClick = {
+                            if (actionable) onClick.invoke()
+                        },
+                        onLongClick = {
+                            if (actionable) onLongClick.invoke()
+                        }
+                    )) {
+                    GlideImage(
+                        modifier = Modifier
+                            .height(70.dp)
+                            .width(actualWidth),
+                        contentScale = ContentScale.Crop,
+                        model = piece.model,
+                        contentDescription = "",
+                        requestBuilderTransform = { it.also {
+                            it.frame(0)
+                        }}
+                    )
+
+                }
+
             }
 
         }
@@ -339,6 +555,12 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
+                    invalidateZoom = {
+                        ValueAnimator.ofFloat(zoom, 1f).apply {
+                            duration = 1000
+                            addUpdateListener { zoom = it.animatedValue as Float }
+                        }.start()
+                    },
                     longestDuration = longestDuration,
                 )
             }

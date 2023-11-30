@@ -1,15 +1,18 @@
 [versions]
 agp = "8.1.4"
 com-github-bumptech-glide-compose = "1.0.0-beta01"
+coreKtx = "1.12.0"
 kotlin = "1.9.20"
 compose = "1.5.4"
 compose-compiler = "1.5.4"
 compose-material3 = "1.1.2"
 androidx-activityCompose = "1.8.0"
 media3ExoplayerDash = "1.0.0"
+mobileFfmpegFull = "4.4.LTS"
 runtimeLivedata = "1.6.0-alpha07"
 
 [libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-media3-common = { module = "androidx.media3:media3-common", version.ref = "media3ExoplayerDash" }
 androidx-media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3ExoplayerDash" }
 androidx-media3-decoder = { module = "androidx.media3:media3-decoder", version.ref = "media3ExoplayerDash" }
@@ -40,6 +43,7 @@ compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = 
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
 compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "compose" }
 compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "compose-material3" }
+mobile-ffmpeg-full = { module = "com.arthenica:mobile-ffmpeg-full", version.ref = "mobileFfmpegFull" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
