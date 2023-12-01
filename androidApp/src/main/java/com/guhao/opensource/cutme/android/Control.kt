@@ -354,7 +354,6 @@ fun Piece(
     zoom: Float = 1f,
 ) {
     val actualWidth = width * zoom
-    val actionable = actualWidth > 30.dp
 
     var offset by remember { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
@@ -428,62 +427,62 @@ fun Piece(
             modifier = Modifier
                 .alpha(0.99f)
                 .drawWithContent {
-                drawContent()
+                    drawContent()
 
-                val radius = size.height / 14
-                val threePosition = size.center.y.let { centerY ->
-                    listOf(centerY, centerY / 2, centerY / 2 * 3)
-                }
-                val strokeWidth = 4f
-                // Left 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
+                    val radius = size.height / 14
+                    val threePosition = size.center.y.let { centerY ->
+                        listOf(centerY, centerY / 2, centerY / 2 * 3)
+                    }
+                    val strokeWidth = 4f
+                    // Left 3
+                    threePosition.forEach { y ->
+                        drawArc(
+                            color = Color.Transparent,
+                            startAngle = 270f,
+                            sweepAngle = 180f,
+                            useCenter = false,
+                            size = Size(width = radius * 2, height = radius * 2),
 
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
+                            topLeft = Offset(x = -radius, y = y - radius),
+                            blendMode = BlendMode.Src,
+                        )
+                        drawArc(
+                            color = Color.White,
+                            startAngle = 270f,
+                            sweepAngle = 180f,
+                            useCenter = false,
+                            size = Size(width = radius * 2, height = radius * 2),
 
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-                // Right 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
+                            topLeft = Offset(x = -radius, y = y - radius),
+                            blendMode = BlendMode.Src,
+                            style = Stroke(width = strokeWidth)
+                        )
+                    }
+                    // Right 3
+                    threePosition.forEach { y ->
+                        drawArc(
+                            color = Color.Transparent,
+                            startAngle = 90f,
+                            sweepAngle = 180f,
+                            useCenter = false,
+                            size = Size(width = radius * 2, height = radius * 2),
 
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
+                            topLeft = Offset(x = size.width - radius, y = y - radius),
+                            blendMode = BlendMode.Src,
+                        )
+                        drawArc(
+                            color = Color.White,
+                            startAngle = 90f,
+                            sweepAngle = 180f,
+                            useCenter = false,
+                            size = Size(width = radius * 2, height = radius * 2),
 
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-            },
+                            topLeft = Offset(x = size.width - radius, y = y - radius),
+                            blendMode = BlendMode.Src,
+                            style = Stroke(width = strokeWidth)
+                        )
+                    }
+                },
             shape = RoundedCornerShape(0.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
         ) {
@@ -494,10 +493,10 @@ fun Piece(
                     .alpha(if (halfAlpha) 0.3f else 1f)
                     .combinedClickable(
                         onClick = {
-                            if (actionable) onClick.invoke()
+                            onClick.invoke()
                         },
                         onLongClick = {
-                            if (actionable) onLongClick.invoke()
+                            onLongClick.invoke()
                         }
                     )) {
                     for(i in 0 until nFrameShouldShow) GlideImage(
@@ -662,7 +661,9 @@ fun Control(
                 end = Offset(x = 0f, y = screenHeightPixel.toFloat()),)
         }
 
-        Column(modifier = Modifier.padding(30.dp).align(Alignment.BottomCenter)) {
+        Column(modifier = Modifier
+            .padding(30.dp)
+            .align(Alignment.BottomCenter)) {
             AnimatedVisibility(
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 enter = fadeIn(), exit = fadeOut(),
@@ -673,7 +674,7 @@ fun Control(
                 ) {
                     val totalDuration = selectedSet.sumOf { it.duration }
                     Text(
-                        text = totalDuration.millisTimeFormat(),
+                        text = "${totalDuration.millisTimeFormat()}(${selectedSet.size})",
                         color = Color.White)
                 }
             }

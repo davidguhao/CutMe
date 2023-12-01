@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -27,13 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Surface
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,10 +42,15 @@ import androidx.compose.ui.Alignment.Companion.BottomCenter
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -163,6 +165,7 @@ fun Select(
             items(list) { currentInfo ->
                 Box {
                     Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
                         modifier = Modifier.padding(5.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
                         shape = RoundedCornerShape(30.dp),
@@ -188,7 +191,10 @@ fun Select(
                             )) {
                             AnimatedContent(targetState = selected, label = "selected") { it ->
                                 GlideImage(
-                                    modifier = Modifier.alpha(if(it) 0.5f else 1f).widthIn(min = 90.dp).heightIn(max = 300.dp),
+                                    modifier = Modifier
+                                        .alpha(if (it) 0.5f else 1f)
+                                        .widthIn(min = 90.dp)
+                                        .heightIn(max = 300.dp),
                                     model = currentInfo.path,
                                     contentScale = contentScale,
                                     contentDescription = "")
@@ -196,9 +202,16 @@ fun Select(
 
                             Column(modifier = Modifier.align(Alignment.Center)) {
                                 currentInfo.duration?.let {
-                                    Text(
-                                        text = it.millisTimeFormat(),
-                                        color = Color.White)
+                                    Card(
+                                        modifier = Modifier.alpha(0.8f),
+                                        colors = CardDefaults.cardColors(containerColor = Color.Black)
+                                    ) {
+                                        Text(
+                                            modifier = Modifier.padding(4.dp),
+                                            text = it.millisTimeFormat(),
+                                            color = Color.White)
+                                    }
+
                                 }
 
                                 AnimatedVisibility(
@@ -208,7 +221,7 @@ fun Select(
                                         modifier = Modifier.padding(1.dp),
                                         text = (selectedList.indexOf(currentInfo) + 1).toString(),
                                         textDecoration = TextDecoration.Underline,
-                                        color = Color.White)
+                                        color = Color.Black)
                                 }
                             }
 
