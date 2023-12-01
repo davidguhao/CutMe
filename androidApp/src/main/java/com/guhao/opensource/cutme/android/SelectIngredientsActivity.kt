@@ -1,6 +1,7 @@
 package com.guhao.opensource.cutme.android
 
-import android.Manifest.permission.*
+import android.Manifest.permission.READ_EXTERNAL_STORAGE
+import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -12,7 +13,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +30,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,15 +41,10 @@ import androidx.compose.ui.Alignment.Companion.BottomCenter
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -61,7 +55,6 @@ import com.guhao.opensource.cutme.millisTimeFormat
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
 import java.io.Serializable
-import kotlin.math.min
 
 class SelectIngredientsActivity: ComponentActivity() {
     private fun requestPermission(): Boolean {
@@ -121,12 +114,12 @@ class SelectIngredientsActivity: ComponentActivity() {
             MyApplicationTheme {
                 Select(
                     list = list,
-                    onSelected = { selectInfos ->
+                    onSelected = { selectInfoList ->
 
                         setResult(RESULT_OK, Intent().apply {
                             putExtra("selected", ByteArrayOutputStream().apply {
                                 ObjectOutputStream(this).use {
-                                    it.writeObject(selectInfos)
+                                    it.writeObject(selectInfoList)
                                 }
                             }.toByteArray())
                         })
@@ -189,7 +182,7 @@ fun Select(
                                     multiSelectedAction()
                                 }
                             )) {
-                            AnimatedContent(targetState = selected, label = "selected") { it ->
+                            AnimatedContent(targetState = selected, label = "selected") {
                                 GlideImage(
                                     modifier = Modifier
                                         .alpha(if (it) 0.5f else 1f)

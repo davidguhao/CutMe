@@ -1,13 +1,10 @@
 package com.guhao.opensource.cutme.android
 
 import android.animation.ValueAnimator
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -20,18 +17,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -50,13 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.center
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -70,122 +57,14 @@ import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import com.bumptech.glide.integration.compose.GlideImage
 import com.guhao.opensource.cutme.millisTimeFormat
 import com.guhao.opensource.cutme.millisTimeStandardFormat
 import kotlinx.coroutines.CancellationException
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.roundToInt
-
-
-class Piece(
-    val model: Any?,
-    val duration: Long
-)
-
-class Track(
-    val pieces: List<Piece>
-)
-
-@Composable
-fun Track(
-    track: Track,
-    onTrackChange: (Track) -> Unit,
-
-    selectedSet: Set<Piece>,
-    onSelectedSetChange: (Set<Piece>) -> Unit,
-
-    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
-
-    zoom: Float = 1f,
-    onZoomChange: (expectedZoom: Float) -> Unit,
-
-    longestDuration: Long,
-    ) {
-
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-
-    /**
-     * Every piece will have a calculated width for it.
-     */
-    var trackLength = 0f
-    val piece2Width = HashMap<Piece, Int>().apply {
-        track.pieces.forEach { piece ->
-            (screenWidthDp * (piece.duration / longestDuration.toFloat())).roundToInt().let {
-                this[piece] = it
-                trackLength += it
-            }
-        }
-    }
-
-    val pieceStates = remember { HashSet<PieceState>() }
-    val isAnyPieceMoving = pieceStates.any { it.isMoving() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp)
-            .zIndex(if (isAnyPieceMoving) 1f else 0f)
-    ) {
-        Spacer(modifier = Modifier.width((screenWidthDp / 2).dp))
-
-        track.pieces.forEach { piece ->
-            val selected = selectedSet.contains(piece)
-            val pieceState = rememberPieceState().also { pieceStates.add(it) }
-            val currentWidth = piece2Width[piece]!!.dp
-            Piece(
-                zoom = zoom,
-                piece = piece,
-                width = currentWidth,
-                selected = selected,
-                onClick = {
-                    onSelectedSetChange(if (selected) {
-                        selectedSet
-                            .filter { it != piece }
-                            .toSet()
-                    } else HashSet(selectedSet).apply { add(piece) })
-                },
-                onLongClick = {
-                    onSelectedSetChange(setOf())
-                },
-                onDragStart = {
-                    onZoomChange(1f)
-                },
-                onDragEnd = {
-                },
-                onDragCancel = {
-                },
-                state = pieceState
-            )
-
-        }
-        IconButton(
-            modifier = Modifier.padding(vertical = 10.dp),
-            onClick = {
-                requestAdding.invoke { result: List<SelectInfo> ->
-                    onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
-                }
-            },
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add",
-                tint = Color.White)
-        }
-
-        Spacer(modifier = Modifier.width((screenWidthDp / 2 - 48).dp))
-
-    }
-}
-
 
 fun PointerEvent.isPointerUp(pointerId: PointerId): Boolean =
     changes.firstOrNull { it.id == pointerId }?.pressed != true
@@ -331,198 +210,6 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
         }
     }
 }
-
-class PieceState {
-    var offset = mutableStateOf(Offset.Zero)
-    fun isMoving(): Boolean = offset.value != Offset.Zero
-}
-
-@Composable
-fun rememberPieceState(): PieceState {
-    return remember { PieceState() }
-}
-@OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
-@Composable
-fun Piece(
-    piece: Piece,
-    width: Dp,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onDragStart: () -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
-
-    zoom: Float = 1f,
-
-    state: PieceState = rememberPieceState()
-) {
-    val actualWidth = width * zoom
-
-    var offset by state.offset
-    var dragging by remember { mutableStateOf(false) }
-    val moving = state.isMoving()
-    Card(
-        modifier = Modifier
-            .zIndex(if (moving) 1f else 0f)
-            .pointerInput(Unit) {
-                dragGesturesAfterLongPress(
-                    onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                        offset += dragAmount
-                    },
-                    onDragStart = {
-                        dragging = true
-
-                        onDragStart.invoke()
-                    },
-                    onDragEnd = {
-                        dragging = false
-
-                        ValueAnimator
-                            .ofFloat(offset.x, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(x = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-                        ValueAnimator
-                            .ofFloat(offset.y, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(y = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-
-                        onDragEnd.invoke()
-                    },
-                    onDragCancel = {
-                        dragging = false
-
-                        ValueAnimator
-                            .ofFloat(offset.x, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(x = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-                        ValueAnimator
-                            .ofFloat(offset.y, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(y = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-
-
-                        onDragCancel.invoke()
-                    }
-                )
-            }
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .alpha(0.99f)
-            .drawWithContent {
-                drawContent()
-
-                val radius = size.height / 14
-                val threePosition = size.center.y.let { centerY ->
-                    listOf(centerY, centerY / 2, centerY / 2 * 3)
-                }
-                val strokeWidth = 4f
-                // Left 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-                // Right 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-            },
-        shape = RoundedCornerShape(0.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp, draggedElevation = 20.dp),
-    ) {
-        Box {
-            AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                Row(modifier = Modifier
-                    .alpha(if (halfAlpha) 0.3f else 1f)
-                    .combinedClickable(
-                        onClick = {
-                            onClick.invoke()
-                        },
-                        onLongClick = {
-                            onLongClick.invoke()
-                        }
-                    )) {
-                    val nFrameShouldShow = (actualWidth.value / 40).toInt().let { if(it == 0) 1 else it}
-                    for(i in 0 until nFrameShouldShow) GlideImage(
-                        modifier = Modifier
-                            .height(70.dp)
-                            .width(actualWidth / nFrameShouldShow),
-                        contentScale = ContentScale.Crop,
-                        model = piece.model,
-                        contentDescription = "",
-                        requestBuilderTransform = { it.apply {
-                            val usedResult = frame(piece.duration / nFrameShouldShow * i * 1000)
-                        }}
-                    )
-                }
-
-            }
-
-        }
-
-
-    }
-}
-
-
 suspend fun PointerInputScope.transformGestures(
     panZoomLock: Boolean = false,
     onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float) -> Unit
@@ -603,7 +290,7 @@ fun ProgressHintText(current: Long, modifier: Modifier) {
         color = Color.White,
         text = current.millisTimeStandardFormat())
 }
-@OptIn(ExperimentalLayoutApi::class)
+
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
@@ -613,7 +300,6 @@ fun Control(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
 ) {
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
-    val selectionMode = selectedPiecesSet.isNotEmpty()
 
     var zoom by remember { mutableFloatStateOf(1f) }
 
@@ -624,7 +310,6 @@ fun Control(
                 if(zoom < 1) zoom = 1f
             }
         )
-
     }) {
         val horizontalScrollState = rememberScrollState()
         val longestDuration = let {
@@ -636,7 +321,8 @@ fun Control(
         }
 
         LazyColumn(
-            modifier = Modifier.padding(top = 50.dp)
+            modifier = Modifier
+                .padding(top = 50.dp)
                 .fillMaxSize()
                 .horizontalScroll(horizontalScrollState)) {
             items(items = tracks) { track ->
@@ -668,94 +354,165 @@ fun Control(
                 )
             }
         }
-        val currentProgress =
-            horizontalScrollState.value / horizontalScrollState.maxValue.toFloat()
-        val current = (longestDuration * currentProgress).toLong() // in milliseconds
+        val currentGlobalProgressInMillis = if(horizontalScrollState.maxValue == 0) 0 else (longestDuration * horizontalScrollState.value / horizontalScrollState.maxValue) // in milliseconds
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
-            ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = current)
+            ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
             Spacer(modifier = Modifier.height(10.dp))
             ProgressHintLine(modifier = Modifier.align(CenterHorizontally))
         }
 
 
-        Column(modifier = Modifier
+        BottomTools(modifier = Modifier
             .padding(30.dp)
-            .align(Alignment.BottomCenter)) {
-            AnimatedVisibility(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                enter = fadeIn(), exit = fadeOut(),
-                visible = selectionMode) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black),
-                    modifier = Modifier.alpha(0.9f)
-                ) {
-                    val totalDuration = selectedPiecesSet.sumOf { it.duration }
-                    Text(
-                        text = "${totalDuration.millisTimeFormat()}(${selectedPiecesSet.size})",
-                        color = Color.White)
-                }
-            }
+            .align(Alignment.BottomCenter),
+            selectedPiecesSet = selectedPiecesSet,
+            onSelectedPiecesSetChange = {
+                selectedPiecesSet = it
+            },
+            tracks = tracks,
+            onTracksChange = onTracksChange,
+            currentGlobalProgressInMillis = currentGlobalProgressInMillis,
+            requestAdding = requestAdding
+        )
+    }
+}
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BottomTools(
+    modifier: Modifier,
+    selectedPiecesSet: Set<Piece>,
+    onSelectedPiecesSetChange: (Set<Piece>) -> Unit,
 
-            AnimatedVisibility(
-                visible = selectionMode
+    tracks: List<Track>,
+    onTracksChange: (List<Track>) -> Unit,
+
+    currentGlobalProgressInMillis: Long,
+    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
+
+) {
+    val selectionMode = selectedPiecesSet.isNotEmpty()
+
+    Column(modifier = modifier) {
+        AnimatedVisibility(
+            modifier = Modifier.align(CenterHorizontally),
+            enter = fadeIn(), exit = fadeOut(),
+            visible = selectionMode) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                modifier = Modifier.alpha(0.9f)
             ) {
-                FlowRow {
-                    IconButton(onClick = {
-                        onTracksChange(ArrayList<Track>().apply {
-                            tracks.forEach { track ->
-                                val newPieces = track.pieces.filter { piece ->
-                                    !selectedPiecesSet.contains(piece)
-                                }
+                val totalDuration = selectedPiecesSet.sumOf { it.duration }
+                Text(
+                    text = "${totalDuration.millisTimeFormat()}(${selectedPiecesSet.size})",
+                    color = Color.White)
+            }
+        }
 
-                                if(newPieces.isNotEmpty()) add(Track(newPieces))
+        AnimatedVisibility(
+            visible = selectionMode
+        ) {
+            FlowRow {
+                /**
+                 * Index of track and pieces
+                 */
+                fun indexOfSelectedPiece(): List<Pair<Int, Int>> {
+                    val result = ArrayList<Pair<Int, Int>>()
+
+                    selectedPiecesSet.forEach { currentSelectedPiece ->
+                        val trackIndex: Int
+                        var pieceIndex: Int
+                        for((index, track) in tracks.withIndex()) {
+                            if(track.pieces.indexOf(currentSelectedPiece).also { pieceIndex = it} > -1) {
+                                trackIndex = index
+                                result.add(Pair(trackIndex, pieceIndex))
+                                break // to continue next
+                            }
+                        }
+                    }
+
+                    return result
+                }
+                IconButton(onClick = {
+                    onTracksChange(ArrayList<Track>().apply {
+                        tracks.forEach { track ->
+                            val newPieces = track.pieces.filter { piece ->
+                                !selectedPiecesSet.contains(piece)
                             }
 
-                            if(isEmpty() || last().pieces.isNotEmpty()) add(Track(listOf()))
-                        })
+                            if(newPieces.isNotEmpty()) add(Track(newPieces))
+                        }
 
-                        selectedPiecesSet = setOf()
+                        if(isEmpty() || last().pieces.isNotEmpty()) add(Track(listOf()))
+                    })
+
+                    onSelectedPiecesSetChange(setOf())
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.White)
+                }
+
+                IconButton(onClick = {
+                    val nextTracks = ArrayList(tracks).apply {
+                        indexOfSelectedPiece().forEach {
+                            val trackIndex = it.first
+                            val pieceIndex = it.second
+
+                            val pieces = this[trackIndex].pieces
+
+                            try {
+
+                                val cutPoint = currentGlobalProgressInMillis -
+                                        pieces.subList(0, pieceIndex).sumOf { p -> p.duration }
+
+                                pieces[pieceIndex].cut(cutPoint).let {
+                                    this[trackIndex] = Track(
+                                        pieces = ArrayList(pieces).apply {
+                                            removeAt(pieceIndex)
+                                            addAll(pieceIndex, listOf(it.first, it.second))
+                                        }
+                                    )
+                                }
+                            } catch(e: Piece.NotInValidScope) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                    onSelectedPiecesSetChange(setOf())
+                    onTracksChange(nextTracks)
+                }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
+                        tint = Color.White,
+                        contentDescription = "cut")
+                }
+
+                AnimatedVisibility(visible = selectedPiecesSet.size == 1) {
+                    IconButton(onClick = {
+                        requestAdding.invoke { result: List<SelectInfo> ->
+                            onTracksChange.invoke(ArrayList(tracks).apply {
+
+                                val tpIndex = indexOfSelectedPiece().first()
+                                val trackIndex: Int = tpIndex.first
+                                val pieceIndex: Int = tpIndex.second
+
+                                this[trackIndex] = Track(
+                                    pieces = ArrayList(tracks[trackIndex].pieces).apply {
+                                        addAll(pieceIndex + 1,
+                                            result.map {
+                                                Piece(
+                                                    model = it.path,
+                                                    end = (it.duration?:2000) - 1) })
+                                    })
+                            })
+                        }
                     }) {
                         Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = Color.White)
-                    }
-
-                    IconButton(onClick = { /*TODO*/ }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
+                            imageVector = Icons.Default.Add,
                             tint = Color.White,
-                            contentDescription = "cut")
-                    }
-
-                    AnimatedVisibility(visible = selectedPiecesSet.size == 1) {
-                        IconButton(onClick = {
-                            val currentSelectedPiece = selectedPiecesSet.first()
-
-                            requestAdding.invoke { result: List<SelectInfo> ->
-                                onTracksChange.invoke(ArrayList(tracks).apply {
-                                    var trackIndex: Int = -1
-                                    var pieceIndex: Int = -1
-
-                                    for((index, track) in tracks.withIndex()) {
-                                        if(track.pieces.indexOf(currentSelectedPiece).also { pieceIndex = it} > -1) {
-                                            trackIndex = index
-                                            break
-                                        }
-                                    }
-
-                                    this[trackIndex] = Track(pieces = ArrayList(tracks[trackIndex].pieces).apply {
-                                        addAll(pieceIndex + 1, result.map { Piece(model = it.path, duration = it.duration?:2000) })
-                                    })
-                                })
-                            }
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                tint = Color.White,
-                                contentDescription = "Add")
-                        }
+                            contentDescription = "Add")
                     }
                 }
             }

@@ -35,7 +35,7 @@ import androidx.media3.ui.PlayerView
 import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
-    val tracks = MutableLiveData(listOf<Track>(Track(listOf())))
+    val tracks = MutableLiveData(listOf(Track(listOf())))
     fun onTracksChange(new: List<Track>) {
         tracks.value = new
     }
@@ -59,14 +59,14 @@ fun DragPad(
 
     Icon(
         imageVector = draggingIcon,
-        contentDescription = "Dragger",
+        contentDescription = "Drag man",
         tint = if(dragging) Color.White else Color.Black,
         modifier = modifier
             .padding(vertical = 10.dp)
             .graphicsLayer(scaleX = 3f)
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDrag = { change: PointerInputChange, dragAmount: Offset ->
+                    onDrag = { _: PointerInputChange, dragAmount: Offset ->
                         val current = targetHeight.invoke() + (dragAmount.y / density).roundToInt()
                         if (current <= screenHeight - draggingIconHeight) {
                             onTargetHeightChange(current)
@@ -117,7 +117,7 @@ fun VideoScreen(
     val context = LocalContext.current
     PlayerSurface(modifier = modifier) { playerView ->
         playerView.player = ExoPlayer.Builder(context).build().apply {
-            mediaItem?.let { it -> setMediaItem(it) }
+            mediaItem?.let { setMediaItem(it) }
 //        prepare()
 //        play()
         }
