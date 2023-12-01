@@ -124,16 +124,20 @@ fun Track(
             }
         }
     }
+
+    val pieceStates = remember { HashSet<PieceState>() }
+    val isAnyPieceMoving = pieceStates.any { it.isMoving() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 10.dp)
+            .zIndex(if(isAnyPieceMoving) 1f else 0f)
     ) {
         Spacer(modifier = Modifier.width((screenWidthDp / 2).dp))
 
         track.pieces.forEach { piece ->
-
             val selected = selectedSet.contains(piece)
+            val pieceState = rememberPieceState().also { pieceStates.add(it) }
             Piece(
                 zoom = zoom,
                 piece = piece,
@@ -155,7 +159,8 @@ fun Track(
                 onDragEnd = {
                 },
                 onDragCancel = {
-                }
+                },
+                state = pieceState
             )
 
         }
@@ -306,7 +311,6 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
             val drag = awaitLongPressOrCancellationMine(down.id)
             if (drag != null) {
                 onDragStart.invoke(drag.position)
-
                 if (
                     dragMine(drag.id) {
                         onDrag(it, it.positionChange())
@@ -329,6 +333,15 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
     }
 }
 
+class PieceState {
+    var offset = mutableStateOf(Offset.Zero)
+    fun isMoving(): Boolean = offset.value != Offset.Zero
+}
+
+@Composable
+fun rememberPieceState(): PieceState {
+    return remember { PieceState() }
+}
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -342,14 +355,17 @@ fun Piece(
     onDragCancel: () -> Unit,
 
     zoom: Float = 1f,
+
+    state: PieceState = rememberPieceState()
 ) {
     val actualWidth = width * zoom
 
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    var offset by state.offset
     var dragging by remember { mutableStateOf(false) }
+    val moving = state.isMoving()
 
     Box(modifier = Modifier
-        .zIndex(if (offset != Offset.Zero) 1f else 0f)
+        .zIndex(if (moving) 1f else 0f)
         .pointerInput(Unit) {
             dragGesturesAfterLongPress(
                 onDrag = { _: PointerInputChange, dragAmount: Offset ->
