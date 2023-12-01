@@ -54,9 +54,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -417,8 +425,66 @@ fun Piece(
         .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
 
         Card(
+            modifier = Modifier
+                .alpha(0.99f)
+                .drawWithContent {
+                drawContent()
+
+                val radius = size.height / 14
+                val threePosition = size.center.y.let { centerY ->
+                    listOf(centerY, centerY / 2, centerY / 2 * 3)
+                }
+                val strokeWidth = 4f
+                // Left 3
+                threePosition.forEach { y ->
+                    drawArc(
+                        color = Color.Transparent,
+                        startAngle = 270f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
+
+                        topLeft = Offset(x = -radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                    )
+                    drawArc(
+                        color = Color.White,
+                        startAngle = 270f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
+
+                        topLeft = Offset(x = -radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+                // Right 3
+                threePosition.forEach { y ->
+                    drawArc(
+                        color = Color.Transparent,
+                        startAngle = 90f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
+
+                        topLeft = Offset(x = size.width - radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                    )
+                    drawArc(
+                        color = Color.White,
+                        startAngle = 90f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
+
+                        topLeft = Offset(x = size.width - radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+            },
             shape = RoundedCornerShape(0.dp),
-            border = if(actionable) null else BorderStroke(0.dp, color = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
         ) {
             AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
@@ -446,29 +512,12 @@ fun Piece(
                             frame(piece.duration / nFrameShouldShow * i * 1000)
                         }}
                     )
-
                 }
 
             }
 
         }
 
-
-        Column(modifier = Modifier.align(Alignment.Center)) {
-            AnimatedVisibility(
-                enter = fadeIn(), exit = fadeOut(),
-                visible = actionable) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.Black),
-                    modifier = Modifier.alpha(0.9f)
-                ) {
-                    Text(
-                        text = piece.duration.millisTimeFormat(),
-                        color = Color.White)
-                }
-
-            }
-        }
     }
 }
 
@@ -613,43 +662,57 @@ fun Control(
                 end = Offset(x = 0f, y = screenHeightPixel.toFloat()),)
         }
 
-        FlowRow(modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(30.dp)) {
+        Column(modifier = Modifier.padding(30.dp).align(Alignment.BottomCenter)) {
             AnimatedVisibility(
-                visible = selectionMode
-            ) {
-                IconButton(onClick = {
-                    onTracksChange(ArrayList<Track>().apply {
-                        tracks.forEach { track ->
-                            val newPieces = track.pieces.filter { piece ->
-                                !selectedSet.contains(piece)
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                enter = fadeIn(), exit = fadeOut(),
+                visible = selectionMode) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.Black),
+                    modifier = Modifier.alpha(0.9f)
+                ) {
+                    val totalDuration = selectedSet.sumOf { it.duration }
+                    Text(
+                        text = totalDuration.millisTimeFormat(),
+                        color = Color.White)
+                }
+            }
+
+            FlowRow {
+                AnimatedVisibility(
+                    visible = selectionMode
+                ) {
+                    IconButton(onClick = {
+                        onTracksChange(ArrayList<Track>().apply {
+                            tracks.forEach { track ->
+                                val newPieces = track.pieces.filter { piece ->
+                                    !selectedSet.contains(piece)
+                                }
+
+                                if(newPieces.isNotEmpty() || tracks.size == 1) add(Track(newPieces))
                             }
-
-                            if(newPieces.isNotEmpty() || tracks.size == 1) add(Track(newPieces))
-                        }
-                    })
-                    selectedSet = setOf()
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = Color.White)
+                        })
+                        selectedSet = setOf()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.White)
+                    }
                 }
-            }
 
-            val cutAvailable = selectionMode && selectedSet.size == 1
-            AnimatedVisibility(
-                visible = cutAvailable) {
-                IconButton(onClick = { /*TODO*/ }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
-                        tint = Color.White,
-                        contentDescription = "cut")
+                val cutAvailable = selectionMode && selectedSet.size == 1
+                AnimatedVisibility(
+                    visible = cutAvailable) {
+                    IconButton(onClick = { /*TODO*/ }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
+                            tint = Color.White,
+                            contentDescription = "cut")
+                    }
                 }
+
             }
-            
         }
-        
     }
 }
