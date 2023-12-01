@@ -105,7 +105,7 @@ fun Track(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
 
     zoom: Float = 1f,
-    invalidateZoom: () -> Unit,
+    onZoomChange: (expectedZoom: Float) -> Unit,
 
     longestDuration: Long,
     ) {
@@ -131,17 +131,18 @@ fun Track(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 10.dp)
-            .zIndex(if(isAnyPieceMoving) 1f else 0f)
+            .zIndex(if (isAnyPieceMoving) 1f else 0f)
     ) {
         Spacer(modifier = Modifier.width((screenWidthDp / 2).dp))
 
         track.pieces.forEach { piece ->
             val selected = selectedSet.contains(piece)
             val pieceState = rememberPieceState().also { pieceStates.add(it) }
+            val currentWidth = piece2Width[piece]!!.dp
             Piece(
                 zoom = zoom,
                 piece = piece,
-                width = piece2Width[piece]!!.dp,
+                width = currentWidth,
                 selected = selected,
                 onClick = {
                     onSelectedSetChange(if (selected) {
@@ -154,7 +155,7 @@ fun Track(
                     onSelectedSetChange(setOf())
                 },
                 onDragStart = {
-                    invalidateZoom.invoke()
+                    onZoomChange(1f)
                 },
                 onDragEnd = {
                 },
@@ -165,11 +166,7 @@ fun Track(
 
         }
         IconButton(
-            modifier = Modifier
-                .padding(
-                    start = 10.dp,
-                    top = 10.dp,
-                    bottom = 10.dp),
+            modifier = Modifier.padding(vertical = 10.dp),
             onClick = {
                 requestAdding.invoke { result: List<SelectInfo> ->
                     onTrackChange(Track(track.pieces + result.map { Piece(model = it.path, duration = it.duration?:2000) } ))
@@ -182,7 +179,7 @@ fun Track(
                 tint = Color.White)
         }
 
-        Spacer(modifier = Modifier.width((screenWidthDp / 2 - 58).dp))
+        Spacer(modifier = Modifier.width((screenWidthDp / 2 - 48).dp))
 
     }
 }
@@ -363,138 +360,134 @@ fun Piece(
     var offset by state.offset
     var dragging by remember { mutableStateOf(false) }
     val moving = state.isMoving()
+    Card(
+        modifier = Modifier
+            .zIndex(if (moving) 1f else 0f)
+            .pointerInput(Unit) {
+                dragGesturesAfterLongPress(
+                    onDrag = { _: PointerInputChange, dragAmount: Offset ->
+                        offset += dragAmount
+                    },
+                    onDragStart = {
+                        dragging = true
 
-    Box(modifier = Modifier
-        .zIndex(if (moving) 1f else 0f)
-        .pointerInput(Unit) {
-            dragGesturesAfterLongPress(
-                onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                    offset += dragAmount
-                },
-                onDragStart = {
-                    dragging = true
+                        onDragStart.invoke()
+                    },
+                    onDragEnd = {
+                        dragging = false
 
-                    onDragStart.invoke()
-                },
-                onDragEnd = {
-                    dragging = false
-
-                    ValueAnimator
-                        .ofFloat(offset.x, 0f)
-                        .apply {
-                            duration = 250
-                            addUpdateListener {
-                                offset = offset.copy(x = it.animatedValue as Float)
+                        ValueAnimator
+                            .ofFloat(offset.x, 0f)
+                            .apply {
+                                duration = 250
+                                addUpdateListener {
+                                    offset = offset.copy(x = it.animatedValue as Float)
+                                }
                             }
-                        }
-                        .start()
-                    ValueAnimator
-                        .ofFloat(offset.y, 0f)
-                        .apply {
-                            duration = 250
-                            addUpdateListener {
-                                offset = offset.copy(y = it.animatedValue as Float)
+                            .start()
+                        ValueAnimator
+                            .ofFloat(offset.y, 0f)
+                            .apply {
+                                duration = 250
+                                addUpdateListener {
+                                    offset = offset.copy(y = it.animatedValue as Float)
+                                }
                             }
-                        }
-                        .start()
+                            .start()
 
-                    onDragEnd.invoke()
-                },
-                onDragCancel = {
-                    dragging = false
+                        onDragEnd.invoke()
+                    },
+                    onDragCancel = {
+                        dragging = false
 
-                    ValueAnimator
-                        .ofFloat(offset.x, 0f)
-                        .apply {
-                            duration = 250
-                            addUpdateListener {
-                                offset = offset.copy(x = it.animatedValue as Float)
+                        ValueAnimator
+                            .ofFloat(offset.x, 0f)
+                            .apply {
+                                duration = 250
+                                addUpdateListener {
+                                    offset = offset.copy(x = it.animatedValue as Float)
+                                }
                             }
-                        }
-                        .start()
-                    ValueAnimator
-                        .ofFloat(offset.y, 0f)
-                        .apply {
-                            duration = 250
-                            addUpdateListener {
-                                offset = offset.copy(y = it.animatedValue as Float)
+                            .start()
+                        ValueAnimator
+                            .ofFloat(offset.y, 0f)
+                            .apply {
+                                duration = 250
+                                addUpdateListener {
+                                    offset = offset.copy(y = it.animatedValue as Float)
+                                }
                             }
-                        }
-                        .start()
+                            .start()
 
 
-                    onDragCancel.invoke()
+                        onDragCancel.invoke()
+                    }
+                )
+            }
+            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
+            .alpha(0.99f)
+            .drawWithContent {
+                drawContent()
+
+                val radius = size.height / 14
+                val threePosition = size.center.y.let { centerY ->
+                    listOf(centerY, centerY / 2, centerY / 2 * 3)
                 }
-            )
-        }
-        .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }) {
+                val strokeWidth = 4f
+                // Left 3
+                threePosition.forEach { y ->
+                    drawArc(
+                        color = Color.Transparent,
+                        startAngle = 270f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
 
-        Card(
-            modifier = Modifier
-                .alpha(0.99f)
-                .drawWithContent {
-                    drawContent()
+                        topLeft = Offset(x = -radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                    )
+                    drawArc(
+                        color = Color.White,
+                        startAngle = 270f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
 
-                    val radius = size.height / 14
-                    val threePosition = size.center.y.let { centerY ->
-                        listOf(centerY, centerY / 2, centerY / 2 * 3)
-                    }
-                    val strokeWidth = 4f
-                    // Left 3
-                    threePosition.forEach { y ->
-                        drawArc(
-                            color = Color.Transparent,
-                            startAngle = 270f,
-                            sweepAngle = 180f,
-                            useCenter = false,
-                            size = Size(width = radius * 2, height = radius * 2),
+                        topLeft = Offset(x = -radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+                // Right 3
+                threePosition.forEach { y ->
+                    drawArc(
+                        color = Color.Transparent,
+                        startAngle = 90f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
 
-                            topLeft = Offset(x = -radius, y = y - radius),
-                            blendMode = BlendMode.Src,
-                        )
-                        drawArc(
-                            color = Color.White,
-                            startAngle = 270f,
-                            sweepAngle = 180f,
-                            useCenter = false,
-                            size = Size(width = radius * 2, height = radius * 2),
+                        topLeft = Offset(x = size.width - radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                    )
+                    drawArc(
+                        color = Color.White,
+                        startAngle = 90f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        size = Size(width = radius * 2, height = radius * 2),
 
-                            topLeft = Offset(x = -radius, y = y - radius),
-                            blendMode = BlendMode.Src,
-                            style = Stroke(width = strokeWidth)
-                        )
-                    }
-                    // Right 3
-                    threePosition.forEach { y ->
-                        drawArc(
-                            color = Color.Transparent,
-                            startAngle = 90f,
-                            sweepAngle = 180f,
-                            useCenter = false,
-                            size = Size(width = radius * 2, height = radius * 2),
-
-                            topLeft = Offset(x = size.width - radius, y = y - radius),
-                            blendMode = BlendMode.Src,
-                        )
-                        drawArc(
-                            color = Color.White,
-                            startAngle = 90f,
-                            sweepAngle = 180f,
-                            useCenter = false,
-                            size = Size(width = radius * 2, height = radius * 2),
-
-                            topLeft = Offset(x = size.width - radius, y = y - radius),
-                            blendMode = BlendMode.Src,
-                            style = Stroke(width = strokeWidth)
-                        )
-                    }
-                },
-            shape = RoundedCornerShape(0.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
-        ) {
+                        topLeft = Offset(x = size.width - radius, y = y - radius),
+                        blendMode = BlendMode.Src,
+                        style = Stroke(width = strokeWidth)
+                    )
+                }
+            },
+        shape = RoundedCornerShape(0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp, draggedElevation = 20.dp),
+    ) {
+        Box {
             AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                val nFrameShouldShow = (actualWidth.value / 40).toInt().let { if(it == 0) 1 else it}
-
                 Row(modifier = Modifier
                     .alpha(if (halfAlpha) 0.3f else 1f)
                     .combinedClickable(
@@ -505,6 +498,7 @@ fun Piece(
                             onLongClick.invoke()
                         }
                     )) {
+                    val nFrameShouldShow = (actualWidth.value / 40).toInt().let { if(it == 0) 1 else it}
                     for(i in 0 until nFrameShouldShow) GlideImage(
                         modifier = Modifier
                             .height(70.dp)
@@ -513,7 +507,6 @@ fun Piece(
                         model = piece.model,
                         contentDescription = "",
                         requestBuilderTransform = { it.apply {
-
                             val usedResult = frame(piece.duration / nFrameShouldShow * i * 1000)
                         }}
                     )
@@ -522,6 +515,7 @@ fun Piece(
             }
 
         }
+
 
     }
 }
@@ -596,8 +590,8 @@ fun Control(
 
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
 ) {
-    var selectedSet by remember { mutableStateOf(setOf<Piece>()) }
-    val selectionMode = selectedSet.isNotEmpty()
+    var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
+    val selectionMode = selectedPiecesSet.isNotEmpty()
 
     var zoom by remember { mutableFloatStateOf(1f) }
 
@@ -638,14 +632,14 @@ fun Control(
                         })
                     },
 
-                    selectedSet = selectedSet,
-                    onSelectedSetChange = { selectedSet = it },
+                    selectedSet = selectedPiecesSet,
+                    onSelectedSetChange = { selectedPiecesSet = it },
 
                     requestAdding = requestAdding,
 
                     zoom = zoom,
-                    invalidateZoom = {
-                        ValueAnimator.ofFloat(zoom, 1f).apply {
+                    onZoomChange = { expectedZoom ->
+                        ValueAnimator.ofFloat(zoom, expectedZoom).apply {
                             duration = 1000
                             addUpdateListener {
                                 zoom = it.animatedValue as Float
@@ -678,22 +672,23 @@ fun Control(
                     colors = CardDefaults.cardColors(containerColor = Color.Black),
                     modifier = Modifier.alpha(0.9f)
                 ) {
-                    val totalDuration = selectedSet.sumOf { it.duration }
+                    val totalDuration = selectedPiecesSet.sumOf { it.duration }
                     Text(
-                        text = "${totalDuration.millisTimeFormat()}(${selectedSet.size})",
+                        text = "${totalDuration.millisTimeFormat()}(${selectedPiecesSet.size})",
                         color = Color.White)
                 }
             }
 
-            FlowRow {
-                AnimatedVisibility(
-                    visible = selectionMode
-                ) {
+
+            AnimatedVisibility(
+                visible = selectionMode
+            ) {
+                FlowRow {
                     IconButton(onClick = {
                         onTracksChange(ArrayList<Track>().apply {
                             tracks.forEach { track ->
                                 val newPieces = track.pieces.filter { piece ->
-                                    !selectedSet.contains(piece)
+                                    !selectedPiecesSet.contains(piece)
                                 }
 
                                 if(newPieces.isNotEmpty()) add(Track(newPieces))
@@ -702,26 +697,50 @@ fun Control(
                             if(isEmpty() || last().pieces.isNotEmpty()) add(Track(listOf()))
                         })
 
-                        selectedSet = setOf()
+                        selectedPiecesSet = setOf()
                     }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete",
                             tint = Color.White)
                     }
-                }
 
-                val cutAvailable = selectionMode && selectedSet.size == 1
-                AnimatedVisibility(
-                    visible = cutAvailable) {
                     IconButton(onClick = { /*TODO*/ }) {
                         Icon(
                             painter = painterResource(id = R.drawable.nc_sample_outline_design_scissors),
                             tint = Color.White,
                             contentDescription = "cut")
                     }
-                }
 
+                    AnimatedVisibility(visible = selectedPiecesSet.size == 1) {
+                        IconButton(onClick = {
+                            val currentSelectedPiece = selectedPiecesSet.first()
+
+                            requestAdding.invoke { result: List<SelectInfo> ->
+                                onTracksChange.invoke(ArrayList(tracks).apply {
+                                    var trackIndex: Int = -1
+                                    var pieceIndex: Int = -1
+
+                                    for((index, track) in tracks.withIndex()) {
+                                        if(track.pieces.indexOf(currentSelectedPiece).also { pieceIndex = it} > -1) {
+                                            trackIndex = index
+                                            break
+                                        }
+                                    }
+
+                                    this[trackIndex] = Track(pieces = ArrayList(tracks[trackIndex].pieces).apply {
+                                        addAll(pieceIndex + 1, result.map { Piece(model = it.path, duration = it.duration?:2000) })
+                                    })
+                                })
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                tint = Color.White,
+                                contentDescription = "Add")
+                        }
+                    }
+                }
             }
         }
     }
