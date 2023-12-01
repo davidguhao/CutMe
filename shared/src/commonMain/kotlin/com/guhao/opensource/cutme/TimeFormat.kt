@@ -1,5 +1,19 @@
 package com.guhao.opensource.cutme
 
+fun Long.millisTimeStandardFormat(): String {
+    val showMillis = this % 1000
+
+    val secs = this / 1000
+    val showSecs = secs % 60
+
+    val mins = secs / 60
+    val showMins = mins % 60
+
+    val showHours = mins / 60
+
+    return "$showHours:$showMins:$showSecs.$showMillis"
+
+}
 fun Long.millisTimeFormat(): String {
     val secsInTotal = this / 1000
 
