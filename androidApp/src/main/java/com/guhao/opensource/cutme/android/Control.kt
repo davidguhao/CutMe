@@ -1,6 +1,7 @@
 package com.guhao.opensource.cutme.android
 
 import android.animation.ValueAnimator
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -300,7 +301,9 @@ fun Control(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
 ) {
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
-
+    BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
+        selectedPiecesSet = setOf()
+    }
     var zoom by remember { mutableFloatStateOf(1f) }
 
     Box(modifier = modifier.pointerInput(Unit) {

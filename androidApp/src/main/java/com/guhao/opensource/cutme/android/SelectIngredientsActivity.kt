@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -153,6 +154,9 @@ fun Select(
     Box(modifier = Modifier.fillMaxSize()) {
         var selectedList by remember { mutableStateOf(listOf<SelectInfo>()) }
         val selectionMode = selectedList.isNotEmpty()
+        BackHandler(enabled = selectionMode) {
+            selectedList = listOf()
+        }
 
         LazyVerticalStaggeredGrid(columns = StaggeredGridCells.Adaptive(100.dp)) {
             items(list) { currentInfo ->
