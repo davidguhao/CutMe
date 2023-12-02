@@ -52,6 +52,10 @@ class Piece(
             throw NotInValidScope("Can't cut it because it's not in valid scope($start until $end)")
     }
 
+    fun strongEquals(another: Piece): Boolean {
+        return this == another && model == another.model && start == another.start && end == another.end
+    }
+
     class NotInValidScope(msg: String): Exception(msg)
 }
 

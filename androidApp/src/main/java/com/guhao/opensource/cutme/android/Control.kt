@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -64,8 +64,11 @@ import androidx.compose.ui.unit.dp
 import com.guhao.opensource.cutme.millisTimeFormat
 import com.guhao.opensource.cutme.millisTimeStandardFormat
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 fun PointerEvent.isPointerUp(pointerId: PointerId): Boolean =
     changes.firstOrNull { it.id == pointerId }?.pressed != true
@@ -292,13 +295,34 @@ fun ProgressHintText(current: Long, modifier: Modifier) {
         text = current.millisTimeStandardFormat())
 }
 
+class ControlState {
+    val progressState = ScrollState(initial = 0)
+    fun calCurrentMillis(duration: Long): Long {
+        return if(progressState.maxValue == 0)
+            0
+        else
+            (duration * progressState.let { it.value / it.maxValue.toFloat() }).roundToLong()
+    }
+}
+@Composable
+fun rememberControlState(): ControlState {
+    return remember { ControlState() }
+}
+fun List<Track>.longestDuration(): Long {
+    var res = 0L
+    forEach { t ->
+        res = res.coerceAtLeast(t.pieces.sumOf { it.duration })
+    }
+    return res
+}
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
     tracks: List<Track>,
     onTracksChange: (List<Track>) -> Unit,
 
-    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit
+    requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
+    controlState: ControlState = rememberControlState()
 ) {
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
     BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
@@ -314,14 +338,8 @@ fun Control(
             }
         )
     }) {
-        val horizontalScrollState = rememberScrollState()
-        val longestDuration = let {
-            var res = 0L
-            tracks.forEach { t ->
-                res = res.coerceAtLeast(t.pieces.sumOf { it.duration })
-            }
-            res
-        }
+        val horizontalScrollState = controlState.progressState
+        val longestDuration = tracks.longestDuration()
 
         LazyColumn(
             modifier = Modifier
@@ -357,7 +375,8 @@ fun Control(
                 )
             }
         }
-        val currentGlobalProgressInMillis = if(horizontalScrollState.maxValue == 0) 0 else (longestDuration * horizontalScrollState.value / horizontalScrollState.maxValue) // in milliseconds
+
+        val currentGlobalProgressInMillis = controlState.calCurrentMillis(longestDuration) // in milliseconds
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
             ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
             Spacer(modifier = Modifier.height(10.dp))
