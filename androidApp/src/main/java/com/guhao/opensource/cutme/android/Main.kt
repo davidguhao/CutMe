@@ -17,6 +17,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,11 +34,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
@@ -119,35 +122,28 @@ fun Main(vm: MainViewModel = MainViewModel()) {
 }
 
 var savedTracks: List<Track>? = null
-fun checkDiffInTracks(tracks: List<Track>): Boolean {
+var savedMediaSource: MediaSource? = null
+fun checkDiffInTracks(newTracks: List<Track>): Boolean {
     if(savedTracks == null) {
-        savedTracks = tracks
         return false
     }
 
-    if(savedTracks!!.size != tracks.size) {
-        savedTracks = tracks
+    if(savedTracks!! != newTracks) {
         return false
     }
 
-    for((index, element) in savedTracks!!.withIndex()) {
-        if(element != tracks[index]) {
-            savedTracks = tracks
+    for((index, savedTrack) in savedTracks!!.withIndex()) {
+        val newTrack = newTracks[index]
+        if(savedTrack != newTrack) {
             return false
         }
 
-        val oldPieces = element.pieces
-        val newPiece = tracks[index].pieces
+        val oldPieces = savedTrack.pieces
+        val newPieces = newTrack.pieces
 
-        if(oldPieces.size != newPiece.size) {
-            savedTracks = tracks
-            return false
-        }
-
-
-        for((index, element) in oldPieces.withIndex()) {
-            if(!element.strongEquals(newPiece[index])) {
-                savedTracks = tracks
+        for((i, oldPiece) in oldPieces.withIndex()) {
+            val newPiece = newPieces[i]
+            if(oldPiece != newPiece) {
                 return false
             }
         }
@@ -156,7 +152,10 @@ fun checkDiffInTracks(tracks: List<Track>): Boolean {
     return true
 }
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-fun List<Track>.generateMediaSource(context: Context): MediaSource {
+fun List<Track>.getMediaSource(context: Context): MediaSource {
+    if(checkDiffInTracks(this)) {
+        return savedMediaSource!!
+    }
     val trackMediaSources = ArrayList<MediaSource>()
 
     forEach { track ->
@@ -168,7 +167,8 @@ fun List<Track>.generateMediaSource(context: Context): MediaSource {
         track.pieces.forEach { piece ->
             try {
                 builder.add(
-                    MediaItem.fromUri(piece.model.toString()), piece.duration)
+                    MediaItem.fromUri(piece.model.toString()),
+                    piece.duration)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -180,7 +180,10 @@ fun List<Track>.generateMediaSource(context: Context): MediaSource {
     return MergingMediaSource(
         false,
         false,
-        *trackMediaSources.toTypedArray())
+        *trackMediaSources.toTypedArray()).also {
+        savedTracks = this
+        savedMediaSource = it
+    }
 
 }
 
@@ -191,45 +194,65 @@ fun VideoScreen(
     controlState: ControlState
 ) {
     Box(modifier = modifier.background(color = Color.Black)) {
-        val context = LocalContext.current
-        val mediaSource = remember(checkDiffInTracks(tracks)) {
-            tracks.generateMediaSource(context)
-        }
+        val mediaSource = tracks.getMediaSource(LocalContext.current)
+        val coroutineScope = rememberCoroutineScope()
 
-        val nextPos = controlState.calCurrentMillis(tracks.longestDuration())
-        PlayerSurface(
+        Player(
             modifier = Modifier.align(Alignment.Center),
-
             mediaSource = mediaSource,
-            nextPos = nextPos)
+            position = controlState.calCurrentMillis(tracks.longestDuration()),
+            onPositionChange = { current: Long, duration:Long ->
+                coroutineScope.launch {
+                    controlState.updateProgress(current, duration)
+                }
+            })
     }
 
 }
 
 @Composable
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-fun PlayerSurface(
+fun Player(
     modifier: Modifier,
     mediaSource: MediaSource,
-    nextPos: Long
+    position: Long,
+    onPositionChange: (Long, Long) -> Unit,
 ) {
+    var currentMediaSource by remember { mutableStateOf<MediaSource?>(null) }
     AndroidView(
         factory = { context ->
             PlayerView(context).apply {
-                useController = true
-                player = ExoPlayer.Builder(context).apply {
 
-                }.build().apply {
-                    setMediaSource(mediaSource)
+                useController = true
+                val builder = ExoPlayer.Builder(context)
+
+                player = builder.build().apply {
+                    addListener(object: Player.Listener {
+                        fun getCurrentPos() {
+                            if(isPlaying) {
+                                onPositionChange(currentPosition, duration)
+                                postDelayed(this::getCurrentPos, 10)
+                            }
+                        }
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            getCurrentPos()
+                        }
+                    })
+
                     prepare()
                 }
             }
         },
         update = { playerView: PlayerView ->
             (playerView.player as ExoPlayer).apply {
-                setMediaSource(mediaSource)
+                // Only when the media source is different, we update,
+                if(currentMediaSource != mediaSource) {
+                    setMediaSource(mediaSource)
+                    currentMediaSource = mediaSource
+                }
 
-                seekTo(nextPos)
+                // Only when it is not playing, we follow the control panel position.
+                if(!(playerView.player as ExoPlayer).isPlaying) seekTo(position)
             }
         },
         modifier = modifier

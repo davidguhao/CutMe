@@ -64,8 +64,6 @@ import androidx.compose.ui.unit.dp
 import com.guhao.opensource.cutme.millisTimeFormat
 import com.guhao.opensource.cutme.millisTimeStandardFormat
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -302,6 +300,12 @@ class ControlState {
             0
         else
             (duration * progressState.let { it.value / it.maxValue.toFloat() }).roundToLong()
+    }
+    suspend fun updateProgress(positionInMillis: Long, duration: Long) {
+        if(duration.toInt() == 0) return
+
+        val nextPosPixel = (progressState.maxValue * positionInMillis / duration).toInt()
+        progressState.scrollTo(nextPosPixel)
     }
 }
 @Composable
