@@ -33,7 +33,7 @@ fun VideoScreen(
         playerUpdateExecutor.updateTouchState(controlState.focusOn)
 
         Player(
-            modifier = Modifier,
+            modifier = Modifier.fillMaxSize(),
 
             playerUpdateExecutor = playerUpdateExecutor,
             controlPosition = controlState.calCurrentMillis(tracks.longestDuration()),
