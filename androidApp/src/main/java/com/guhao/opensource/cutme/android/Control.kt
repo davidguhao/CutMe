@@ -214,6 +214,7 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
 }
 suspend fun PointerInputScope.transformGestures(
     panZoomLock: Boolean = false,
+    onTouch: () -> Unit = {},
     onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float) -> Unit
 ) {
     awaitEachGesture {
@@ -225,6 +226,7 @@ suspend fun PointerInputScope.transformGestures(
         var lockedToPanZoom = false
 
         awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = true)
+        onTouch.invoke()
         do {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val canceled = event.changes.any { it.isConsumed }
@@ -294,6 +296,7 @@ fun ProgressHintText(current: Long, modifier: Modifier) {
 }
 
 class ControlState {
+    var focusOn: Boolean = false
     val progressState = ScrollState(initial = 0)
     fun calCurrentMillis(duration: Long): Long {
         return if(progressState.maxValue == 0)
@@ -336,6 +339,9 @@ fun Control(
 
     Box(modifier = modifier.pointerInput(Unit) {
         transformGestures(
+            onTouch = {
+                controlState.focusOn = true
+            },
             onGesture = { _, _, gestureZoom, _ ->
                 zoom *= gestureZoom
                 if(zoom < 1) zoom = 1f
