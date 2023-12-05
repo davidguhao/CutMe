@@ -1,21 +1,42 @@
 package com.guhao.opensource.cutme.android
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.launch
 
@@ -131,9 +152,13 @@ class PlayerUpdateExecutor {
                 var added = false
                 track.pieces.forEach { piece ->
                     try {
-                        builder.add(
-                            MediaItem.fromUri(piece.model.toString()),
-                            piece.duration)
+                        val raw = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context))
+                            .createMediaSource(MediaItem.fromUri(piece.model.toString()))
+                        val clipped = ClippingMediaSource(
+                            raw,
+                            piece.start * 1000,
+                            piece.end * 1000)
+                        builder.add(clipped, piece.duration)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -158,48 +183,110 @@ fun Player(
     onPlayerPositionContinuouslyChange: (Long, Long) -> Unit,
     onIsPlayingChanged: (Boolean) -> Unit
 ) {
-    AndroidView(
-        factory = { context ->
-            PlayerView(context).apply {
+    var controllerIsPlaying by remember { mutableStateOf(false) }
+    var localPlayer by remember { mutableStateOf<ExoPlayer?>(null)}
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { context ->
+                PlayerView(context).apply {
 
-                useController = true
-                val builder = ExoPlayer.Builder(context)
+                    useController = false
+                    val builder = ExoPlayer.Builder(context)
 
-                player = builder.build().apply {
-                    addListener(object: Player.Listener {
-                        fun getCurrentPos() {
-                            if(isPlaying) {
-                                onPlayerPositionContinuouslyChange(currentPosition, duration)
-                                postDelayed(this::getCurrentPos, 10)
+                    player = builder.build().apply {
+                        addListener(object: Player.Listener {
+                            fun getCurrentPos() {
+                                if(isPlaying) {
+                                    onPlayerPositionContinuouslyChange(currentPosition, duration)
+                                    postDelayed(this::getCurrentPos, 5)
+                                }
                             }
-                        }
-                        override fun onIsPlayingChanged(isPlaying: Boolean) {
-                            onIsPlayingChanged(isPlaying)
+                            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                controllerIsPlaying = isPlaying
 
-                            getCurrentPos()
-                        }
-                    })
+                                onIsPlayingChanged(isPlaying)
 
-                    prepare()
-                }
-            }
-        },
-        update = { playerView: PlayerView ->
-            (playerView.player as ExoPlayer).apply {
-                // Only when the media source is different, we update,
-                playerUpdateExecutor.execOnNewMediaSource {
-                    setMediaSource(it)
-                }
+                                getCurrentPos()
+                            }
+                        })
 
-                // Only when it is not playing, we follow the control panel position.
-                playerUpdateExecutor.execOnTouch {
-                    if((playerView.player as ExoPlayer).isPlaying) pause()
-                    seekTo(controlPosition)
+                        prepare()
+                    }.also { localPlayer = it }
                 }
-            }
-        },
-        modifier = modifier
-    )
+            },
+            update = { playerView: PlayerView ->
+                (playerView.player as ExoPlayer).apply {
+                    // Only when the media source is different, we update,
+                    playerUpdateExecutor.execOnNewMediaSource {
+                        setMediaSource(it)
+                    }
+
+                    // Only when it is not playing, we follow the control panel position.
+                    playerUpdateExecutor.execOnTouch {
+                        val player = (playerView.player as ExoPlayer)
+                        if(player.isPlaying) pause()
+                        seekTo(controlPosition)
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        PlayerController(
+            modifier = Modifier.fillMaxSize(),
+            isPlaying = controllerIsPlaying,
+            onIsPlayingChange = { isPlaying ->
+                localPlayer?.let {
+                    if(isPlaying) it.play() else it.pause()
+                }
+            })
+    }
+
 }
 
+@Composable
+fun PlayerController(
+    modifier: Modifier,
 
+    isPlaying: Boolean,
+    onIsPlayingChange: (Boolean) -> Unit,
+) {
+    var showController by remember { mutableStateOf(true) }
+
+    Box(modifier = modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onTap = {
+                showController = !showController
+            }
+        )
+    }) {
+        AnimatedVisibility(
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(), exit = fadeOut(),
+            visible = showController) {
+            IconButton(
+                modifier = Modifier.graphicsLayer(
+                    scaleX = 2f, scaleY = 2f
+                ),
+                onClick = { onIsPlayingChange.invoke(!isPlaying) }) {
+                AnimatedContent(targetState = isPlaying, label = "isPlaying") { isPlaying ->
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "isPlaying",
+                        tint = Color.White,
+                        modifier = Modifier.drawWithContent {
+                            drawContent()
+                            drawCircle(
+                                color = Color.Black,
+                                radius = size.width / 2,
+                                alpha = 0.8f,
+                                blendMode = if(isPlaying) BlendMode.SrcOut else BlendMode.DstOver
+                            )
+                        })
+                }
+
+            }
+        }
+    }
+
+}

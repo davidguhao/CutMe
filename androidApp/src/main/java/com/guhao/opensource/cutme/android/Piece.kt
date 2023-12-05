@@ -213,7 +213,7 @@ fun Piece(
     ) {
         Box {
             AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                Row(modifier = Modifier
+                Row(modifier = Modifier.width(actualWidth)
                     .alpha(if (halfAlpha) 0.3f else 1f)
                     .combinedClickable(
                         onClick = {
