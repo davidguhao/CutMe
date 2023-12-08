@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -322,6 +323,30 @@ fun List<Track>.longestDuration(): Long {
     }
     return res
 }
+
+@Composable
+fun ZoomBox(
+    modifier: Modifier,
+
+    zoom: () -> Float,
+    onZoomChange: (Float) -> Unit,
+
+    onTouch: () -> Unit,
+
+    content: @Composable BoxScope.() -> Unit
+    ) {
+    Box(modifier = modifier.pointerInput(Unit) {
+        transformGestures(
+            onTouch = {
+                onTouch.invoke()
+            },
+            onGesture = { _, _, gestureZoom, _ ->
+                onZoomChange((zoom.invoke() * gestureZoom).coerceAtLeast(0.5f))
+            }
+        )
+    }, content = content)
+}
+
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
@@ -335,21 +360,20 @@ fun Control(
     BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
         selectedPiecesSet = setOf()
     }
-    var zoom by remember { mutableFloatStateOf(1f) }
 
-    Box(modifier = modifier.pointerInput(Unit) {
-        transformGestures(
-            onTouch = {
-                controlState.focusOn = true
-            },
-            onGesture = { _, _, gestureZoom, _ ->
-                zoom *= gestureZoom
-                if(zoom < 1) zoom = 1f
-            }
-        )
-    }) {
+    var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
+
+    var zoom by remember { mutableFloatStateOf(1f) }
+    ZoomBox(
+        modifier = modifier,
+        onTouch = {
+            controlState.focusOn = true
+        },
+        zoom = { zoom },
+        onZoomChange = { zoom = it }
+    ) {
         val horizontalScrollState = controlState.progressState
-        val longestDuration = tracks.longestDuration()
+        val totalDuration = tracks.longestDuration()
 
         LazyColumn(
             modifier = Modifier
@@ -373,7 +397,7 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
-                    onZoomChange = { expectedZoom ->
+                    onZoomChange = { expectedZoom: Float ->
                         ValueAnimator.ofFloat(zoom, expectedZoom).apply {
                             duration = 1000
                             addUpdateListener {
@@ -381,12 +405,16 @@ fun Control(
                             }
                         }.start()
                     },
-                    longestDuration = longestDuration,
+                    totalDuration = totalDuration,
+                    draggingItem = draggingItem,
+                    onDraggingItemChange = {
+                        draggingItem = it
+                    }
                 )
             }
         }
 
-        val currentGlobalProgressInMillis = controlState.calCurrentMillis(longestDuration) // in milliseconds
+        val currentGlobalProgressInMillis = controlState.calCurrentMillis(totalDuration) // in milliseconds
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
             ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
             Spacer(modifier = Modifier.height(10.dp))

@@ -4,7 +4,7 @@ import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -21,20 +21,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -55,103 +60,13 @@ class Piece(
     class NotInValidScope(msg: String): Exception(msg)
 }
 
-class PieceState {
-    var offset = mutableStateOf(Offset.Zero)
-    fun isMoving(): Boolean = offset.value != Offset.Zero
-}
-
 @Composable
-fun rememberPieceState(): PieceState {
-    return remember { PieceState() }
-}
-@OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
-@Composable
-fun Piece(
-    piece: Piece,
-    width: Dp,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onDragStart: () -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
-
-    zoom: Float = 1f,
-
-    state: PieceState = rememberPieceState()
+fun PieceCard(
+    modifier: Modifier = Modifier, // have to specify the alpha = 0.99f in normal cases.
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    val actualWidth = width * zoom
-
-    var offset by state.offset
-    var dragging by remember { mutableStateOf(false) }
-    val moving = state.isMoving()
     Card(
-        modifier = Modifier
-            .zIndex(if (moving) 1f else 0f)
-            .pointerInput(Unit) {
-                dragGesturesAfterLongPress(
-                    onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                        offset += dragAmount
-                    },
-                    onDragStart = {
-                        dragging = true
-
-                        onDragStart.invoke()
-                    },
-                    onDragEnd = {
-                        dragging = false
-
-                        ValueAnimator
-                            .ofFloat(offset.x, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(x = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-                        ValueAnimator
-                            .ofFloat(offset.y, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(y = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-
-                        onDragEnd.invoke()
-                    },
-                    onDragCancel = {
-                        dragging = false
-
-                        ValueAnimator
-                            .ofFloat(offset.x, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(x = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-                        ValueAnimator
-                            .ofFloat(offset.y, 0f)
-                            .apply {
-                                duration = 250
-                                addUpdateListener {
-                                    offset = offset.copy(y = it.animatedValue as Float)
-                                }
-                            }
-                            .start()
-
-
-                        onDragCancel.invoke()
-                    }
-                )
-            }
-            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .alpha(0.99f)
-            .drawWithContent {
+        modifier = modifier.drawWithContent {
                 drawContent()
 
                 val radius = size.height / 14
@@ -210,37 +125,153 @@ fun Piece(
             },
         shape = RoundedCornerShape(0.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 10.dp, draggedElevation = 20.dp),
-    ) {
-        Box {
-            AnimatedContent(targetState = selected || dragging, label = "") { halfAlpha ->
-                Row(modifier = Modifier.width(actualWidth)
-                    .alpha(if (halfAlpha) 0.3f else 1f)
-                    .combinedClickable(
-                        onClick = {
-                            onClick.invoke()
-                        },
-                        onLongClick = {
-                            onLongClick.invoke()
-                        }
-                    )) {
-                    val nFrameShouldShow = (actualWidth.value / 40).toInt().let { if(it == 0) 1 else it}
-                    for(i in 0 until nFrameShouldShow) GlideImage(
-                        modifier = Modifier
-                            .height(70.dp)
-                            .width(actualWidth / nFrameShouldShow),
-                        contentScale = ContentScale.Crop,
-                        model = piece.model,
-                        contentDescription = "",
-                        requestBuilderTransform = { it.apply {
-                            frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
-                        }}
-                    )
-                }
+        content = content
+    )
+}
+data class DraggingItem(
+    val position: Offset,
+    val width: Dp,
+)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
+@Composable
+fun Piece(
+    piece: Piece,
+    width: Dp,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
 
+    zoom: Float = 1f,
+
+    draggingItem: DraggingItem?,
+    onDraggingItemChange: (DraggingItem?) -> Unit,
+) {
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val flying = offset != Offset.Zero
+    var currentRect by remember { mutableStateOf(Rect.Zero) }
+
+    val actualWidth = width * zoom
+    val pieceHeight = 70.dp
+
+    fun isInScope(randomPoint: Offset): Boolean {
+        val xInScope = abs(randomPoint.x - currentRect.center.x) < currentRect.width / 2
+        val yInScope = abs(randomPoint.y - currentRect.center.y) < currentRect.height / 2
+
+        return xInScope && yInScope
+    }
+    val draggingInScope = draggingItem?.let { isInScope(it.position) }?: false
+    val returnToOldPlace = {
+        ValueAnimator
+            .ofFloat(offset.x, 0f)
+            .apply {
+                duration = 250
+                addUpdateListener {
+                    offset = offset.copy(x = it.animatedValue as Float)
+                }
+            }
+            .start()
+        ValueAnimator
+            .ofFloat(offset.y, 0f)
+            .apply {
+                duration = 250
+                addUpdateListener {
+                    offset = offset.copy(y = it.animatedValue as Float)
+                }
+            }
+            .start()
+    }
+
+    var draggingScaleRate by remember { mutableStateOf(1f) }
+    PieceCard(modifier = Modifier
+        .onGloballyPositioned { layoutCoordinates ->
+            currentRect = layoutCoordinates.boundsInWindow()
+        }
+        .pointerInput(Unit) {
+            dragGesturesAfterLongPress(
+
+                onDragStart = {
+                    val easyToDragWidth = 100.dp
+                    val targetRate = easyToDragWidth / actualWidth
+
+                    ValueAnimator.ofFloat(draggingScaleRate, targetRate).apply {
+                        duration = 250
+                        addUpdateListener {
+                            draggingScaleRate = it.animatedValue as Float
+                        }
+                    }.start()
+                },
+                onDrag = { _: PointerInputChange, dragAmount: Offset ->
+                    offset += dragAmount
+
+                    onDraggingItemChange.invoke(
+                        DraggingItem(
+                            position = currentRect.center + offset,
+                            width = actualWidth
+                        )
+                    )
+                },
+                onDragEnd = {
+                    returnToOldPlace.invoke()
+                    onDraggingItemChange.invoke(null)
+
+                    ValueAnimator.ofFloat(draggingScaleRate, 1f).apply {
+                        duration = 250
+                        addUpdateListener {
+                            draggingScaleRate = it.animatedValue as Float
+                        }
+                    }.start()
+                },
+                onDragCancel = {
+                    returnToOldPlace.invoke()
+                    onDraggingItemChange.invoke(null)
+                    ValueAnimator.ofFloat(draggingScaleRate, 1f).apply {
+                        duration = 250
+                        addUpdateListener {
+                            draggingScaleRate = it.animatedValue as Float
+                        }
+                    }.start()
+                }
+            )
+        }
+        .offset { IntOffset(x = offset.x.roundToInt(), y = offset.y.roundToInt()) }
+        .zIndex(if (flying) 1f else 0f)
+        .graphicsLayer(
+            alpha = if (draggingInScope) 0.5f else 0.99f,
+            scaleX = draggingScaleRate)
+
+    ) {
+        AnimatedContent(targetState = selected, label = "") { halfAlpha ->
+            Row(
+                modifier = Modifier
+                .alpha(if (halfAlpha) 0.2f else 1f)
+                .combinedClickable(
+                    onClick = {
+                        onClick.invoke()
+                    },
+                    onLongClick = {
+                        onLongClick.invoke()
+                    }
+                )
+                .width(actualWidth)
+
+            ) {
+
+                val expectingWidthForEachFrame = 40
+                val nFrameShouldShow = (actualWidth.value / expectingWidthForEachFrame).toInt().let { if(it == 0) 1 else it}
+
+                for(i in 0 until nFrameShouldShow) GlideImage(
+                    modifier = Modifier
+                        .height(pieceHeight)
+                        .width(actualWidth / nFrameShouldShow),
+                    contentScale = ContentScale.Crop,
+                    model = piece.model,
+                    contentDescription = "",
+                    requestBuilderTransform = {
+                        it.frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
+                    }
+                )
             }
 
         }
-
-
     }
 }

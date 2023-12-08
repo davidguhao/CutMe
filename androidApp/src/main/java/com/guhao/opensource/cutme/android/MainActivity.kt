@@ -56,7 +56,9 @@ class MainActivity : ComponentActivity() {
             ): Intent {
                 onFileLoadedListener = input
 
-                return Intent(context, SelectIngredientsActivity::class.java)
+                return Intent(context, SelectIngredientsActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
             }
         }
     ) {

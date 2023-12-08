@@ -10,12 +10,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 
 class Track(
@@ -35,81 +33,62 @@ fun Track(
     zoom: Float = 1f,
     onZoomChange: (expectedZoom: Float) -> Unit,
 
-    longestDuration: Long,
+    totalDuration: Long,
+
+    draggingItem: DraggingItem?,
+    onDraggingItemChange: (DraggingItem?) -> Unit
 ) {
-
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-
-    /**
-     * Every piece will have a calculated width for it.
-     */
-    var trackLength = 0f
-    val piece2Width = HashMap<Piece, Int>().apply {
-        track.pieces.forEach { piece ->
-            (screenWidthDp * (piece.duration / longestDuration.toFloat())).roundToInt().let {
-                this[piece] = it
-                trackLength += it
-            }
-        }
-    }
-
-    val pieceStates = remember { HashSet<PieceState>() }
-    val isAnyPieceMoving = pieceStates.any { it.isMoving() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 10.dp)
-            .zIndex(if (isAnyPieceMoving) 1f else 0f)
     ) {
-        Spacer(modifier = Modifier.width((screenWidthDp / 2).dp))
+        val maxTrackLength = LocalConfiguration.current.screenWidthDp
+
+        Spacer(modifier = Modifier.width((maxTrackLength / 2).dp))
 
         track.pieces.forEach { piece ->
             val selected = selectedSet.contains(piece)
-            val pieceState = rememberPieceState().also { pieceStates.add(it) }
-            val currentWidth = piece2Width[piece]!!.dp
+            val pieceWidth = (maxTrackLength * (piece.duration / totalDuration.toFloat())).roundToInt().dp
             Piece(
                 zoom = zoom,
                 piece = piece,
-                width = currentWidth,
+                width = pieceWidth,
                 selected = selected,
                 onClick = {
                     onSelectedSetChange(if (selected) {
                         selectedSet
                             .filter { it != piece }
                             .toSet()
-                    } else HashSet(selectedSet).apply { add(piece) })
+                    } else selectedSet + piece)
                 },
                 onLongClick = {
                     onSelectedSetChange(setOf())
                 },
-                onDragStart = {
-                    onZoomChange(1f)
-                },
-                onDragEnd = {
-                },
-                onDragCancel = {
-                },
-                state = pieceState
+                draggingItem = draggingItem,
+                onDraggingItemChange = onDraggingItemChange
             )
-
         }
-        IconButton(
-            modifier = Modifier.padding(vertical = 10.dp),
-            onClick = {
-                requestAdding.invoke { result: List<SelectInfo> ->
-                    onTrackChange(Track(track.pieces + result.map {
-                        Piece(
-                            model = it.path, end = (it.duration?:2000) - 1) } ))
-                }
-            },
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add",
-                tint = Color.White)
+        AddPieceButton {
+            requestAdding.invoke { result: List<SelectInfo> ->
+                onTrackChange(Track(track.pieces + result.map {
+                    Piece(
+                        model = it.path, end = (it.duration?:2000) - 1) } ))
+            }
         }
+        Spacer(modifier = Modifier.width((maxTrackLength / 2 - 48).dp))
+    }
+}
 
-        Spacer(modifier = Modifier.width((screenWidthDp / 2 - 48).dp))
-
+@Composable
+fun AddPieceButton(onClick: () -> Unit) {
+    IconButton(
+        modifier = Modifier.padding(vertical = 10.dp),
+        onClick = onClick,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Add,
+            contentDescription = "Add",
+            tint = Color.White)
     }
 }
