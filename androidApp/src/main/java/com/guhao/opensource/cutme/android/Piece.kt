@@ -14,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -181,7 +182,7 @@ fun Piece(
             .start()
     }
 
-    var draggingScaleRate by remember { mutableStateOf(1f) }
+    var draggingScaleRate by remember { mutableFloatStateOf(1f) }
     PieceCard(modifier = Modifier
         .onGloballyPositioned { layoutCoordinates ->
             currentRect = layoutCoordinates.boundsInWindow()
@@ -191,7 +192,7 @@ fun Piece(
 
                 onDragStart = {
                     val easyToDragWidth = 100.dp
-                    val targetRate = easyToDragWidth / actualWidth
+                    val targetRate = if(easyToDragWidth < actualWidth) easyToDragWidth / actualWidth else 1f
 
                     ValueAnimator.ofFloat(draggingScaleRate, targetRate).apply {
                         duration = 250
