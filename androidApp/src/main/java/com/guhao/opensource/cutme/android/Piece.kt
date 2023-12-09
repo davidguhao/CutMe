@@ -4,15 +4,11 @@ import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,14 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.center
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -85,20 +75,23 @@ fun Piece(
 
     draggingItem: DraggingItem?,
     onDraggingItemChange: (DraggingItem?) -> Unit,
+
+    compensationTranslationX: Float,
+    onCompensationTranslationXChange: (Float) -> Unit
 ) {
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    val flying = offset != Offset.Zero
+    var draggingOffset by remember { mutableStateOf(Offset.Zero) }
+    val flying = draggingOffset != Offset.Zero
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
     val actualWidth = width * zoom
     val pieceHeight = 70.dp
 
-    var translationXForDrag by remember { mutableFloatStateOf(0f) }
+    var translationXForDragDp by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current.density
     fun isInScope(randomPoint: Offset): Boolean {
         if(flying) return false
 
-        (translationXForDrag * density).let {
+        (translationXForDragDp * density).let {
             val coverCenter = Offset(
                 x = currentRect.center.x - it / 2,
                 y = currentRect.center.y
@@ -119,37 +112,40 @@ fun Piece(
         } else 0f
 
         println("Current draggingItemWidth = $transTarget")
-        ValueAnimator.ofFloat(translationXForDrag, transTarget).apply {
+        ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
             duration = 250
             addUpdateListener { animator ->
-                translationXForDrag = animator.animatedValue as Float
-                println("CurrentTransValue $translationXForDrag")
+                translationXForDragDp = animator.animatedValue as Float
+                onCompensationTranslationXChange.invoke(translationXForDragDp * density)
+                println("CurrentTransValue $translationXForDragDp")
             }
         }.start()
+
+
     }
     val returnToOldPlace = {
         ValueAnimator
-            .ofFloat(offset.x, 0f)
+            .ofFloat(draggingOffset.x, 0f)
             .apply {
                 duration = 250
                 addUpdateListener {
-                    offset = offset.copy(x = it.animatedValue as Float)
+                    draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
                 }
             }
             .start()
         ValueAnimator
-            .ofFloat(offset.y, 0f)
+            .ofFloat(draggingOffset.y, 0f)
             .apply {
                 duration = 250
                 addUpdateListener {
-                    offset = offset.copy(y = it.animatedValue as Float)
+                    draggingOffset = draggingOffset.copy(y = it.animatedValue as Float)
                 }
             }
             .start()
     }
 
     PieceCard(modifier = Modifier
-        .padding(start = translationXForDrag.dp)
+        .padding(start = translationXForDragDp.dp)
         .onGloballyPositioned { layoutCoordinates ->
             currentRect = layoutCoordinates.boundsInWindow()
         }
@@ -159,11 +155,11 @@ fun Piece(
                 onDragStart = {
                 },
                 onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                    offset += dragAmount
+                    draggingOffset += dragAmount
 
                     onDraggingItemChange.invoke(
                         DraggingItem(
-                            position = currentRect.center + offset,
+                            position = currentRect.center + draggingOffset,
                             width = currentRect.width.toDp(),
                         )
                     )
@@ -179,10 +175,10 @@ fun Piece(
                 }
             )
         }
-        .offset { IntOffset(x = offset.x.roundToInt(), y = offset.y.roundToInt()) }
+        .offset { IntOffset(x = (draggingOffset.x - if(flying) compensationTranslationX else 0f).roundToInt(), y = draggingOffset.y.roundToInt()) } // Pixel
         .zIndex(if (flying) 1f else 0f)
         .graphicsLayer(
-            alpha = if (draggingInScope) 0.5f else 0.99f)
+            alpha = 0.99f)
 
     ) {
         AnimatedContent(targetState = selected, label = "") { halfAlpha ->

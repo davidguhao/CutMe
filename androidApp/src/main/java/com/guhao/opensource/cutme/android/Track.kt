@@ -10,10 +10,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.roundToInt
 
 class Track(
@@ -47,7 +56,10 @@ fun Track(
 
         Spacer(modifier = Modifier.width((maxTrackLength / 2).dp))
 
-        track.pieces.forEach { piece ->
+        val compensationMap = remember { mutableStateListOf<Pair<Int, Float>>() }
+
+        track.pieces.forEachIndexed { index, piece ->
+
             val selected = selectedSet.contains(piece)
             val pieceWidth = (maxTrackLength * (piece.duration / totalDuration.toFloat())).roundToInt().dp
             Piece(
@@ -66,7 +78,19 @@ fun Track(
                     onSelectedSetChange(setOf())
                 },
                 draggingItem = draggingItem,
-                onDraggingItemChange = onDraggingItemChange
+                onDraggingItemChange = onDraggingItemChange,
+                compensationTranslationX = compensationMap.filter { it.first < index }.map { it.second }.sum(),
+                onCompensationTranslationXChange = { x ->
+                    compensationMap.apply {
+                        val ready = Pair(index, x)
+
+                        if(any { it.first == index })
+                            set(index, ready)
+                        else
+                            add(ready)
+                    }
+
+                }
             )
         }
         AddPieceButton {
