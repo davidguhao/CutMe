@@ -101,6 +101,7 @@ fun Main(vm: MainViewModel = MainViewModel()) {
     Column {
         val tracks by vm.tracks.observeAsState(listOf(Track(listOf())))
         val controlState = rememberControlState()
+
         VideoScreen(
             modifier = Modifier.height(videoHeight.dp),
             tracks = tracks,
@@ -123,7 +124,8 @@ fun Main(vm: MainViewModel = MainViewModel()) {
             tracks = tracks,
             onTracksChange = vm::onTracksChange,
             requestAdding = vm.requestAdding,
-            controlState = controlState)
+            controlState = controlState,
+            )
     }
 }
 

@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,12 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+
+data class DraggingItem(
+    val position: Offset,
+    val width: Dp,
+)
 
 class Piece(
     val model: Any?,
@@ -60,79 +69,6 @@ class Piece(
 
     class NotInValidScope(msg: String): Exception(msg)
 }
-
-@Composable
-fun PieceCard(
-    modifier: Modifier = Modifier, // have to specify the alpha = 0.99f in normal cases.
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = modifier.drawWithContent {
-                drawContent()
-
-                val radius = size.height / 14
-                val threePosition = size.center.y.let { centerY ->
-                    listOf(centerY, centerY / 2, centerY / 2 * 3)
-                }
-                val strokeWidth = 4f
-                // Left 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = -radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-                // Right 3
-                threePosition.forEach { y ->
-                    drawArc(
-                        color = Color.Transparent,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                    )
-                    drawArc(
-                        color = Color.White,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        size = Size(width = radius * 2, height = radius * 2),
-
-                        topLeft = Offset(x = size.width - radius, y = y - radius),
-                        blendMode = BlendMode.Src,
-                        style = Stroke(width = strokeWidth)
-                    )
-                }
-            },
-        shape = RoundedCornerShape(0.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp, draggedElevation = 20.dp),
-        content = content
-    )
-}
-data class DraggingItem(
-    val position: Offset,
-    val width: Dp,
-)
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -154,13 +90,40 @@ fun Piece(
     val actualWidth = width * zoom
     val pieceHeight = 70.dp
 
+    var translationXForDrag by remember { mutableFloatStateOf(0f) }
     fun isInScope(randomPoint: Offset): Boolean {
-        val xInScope = abs(randomPoint.x - currentRect.center.x) < currentRect.width / 2
-        val yInScope = abs(randomPoint.y - currentRect.center.y) < currentRect.height / 2
+        if(flying) return false
 
-        return xInScope && yInScope
+        translationXForDrag.let {
+            val coverCenter = Offset(
+                x = currentRect.center.x - it / 2,
+                y = currentRect.center.y
+            )
+
+            val xInScope = abs(randomPoint.x - coverCenter.x) < (it + currentRect.width) / 2
+            val yInScope = abs(randomPoint.y - coverCenter.y) < currentRect.height / 2
+
+            return xInScope && yInScope
+        }
     }
+
     val draggingInScope = draggingItem?.let { isInScope(it.position) }?: false
+
+    LaunchedEffect(key1 = draggingInScope) {
+        val transTarget = if(draggingInScope) {
+            // draggingItem!!.width.value * zoom
+            20f
+        } else 0f
+
+        println("Current draggingItemWidth = $transTarget")
+        ValueAnimator.ofFloat(translationXForDrag, transTarget).apply {
+            duration = 250
+            addUpdateListener { animator ->
+                translationXForDrag = animator.animatedValue as Float
+                println("CurrentTransValue $translationXForDrag")
+            }
+        }.start()
+    }
     val returnToOldPlace = {
         ValueAnimator
             .ofFloat(offset.x, 0f)
@@ -182,8 +145,8 @@ fun Piece(
             .start()
     }
 
-    var draggingScaleRate by remember { mutableFloatStateOf(1f) }
     PieceCard(modifier = Modifier
+        .padding(start = translationXForDrag.dp)
         .onGloballyPositioned { layoutCoordinates ->
             currentRect = layoutCoordinates.boundsInWindow()
         }
@@ -191,15 +154,6 @@ fun Piece(
             dragGesturesAfterLongPress(
 
                 onDragStart = {
-                    val easyToDragWidth = 100.dp
-                    val targetRate = if(easyToDragWidth < actualWidth) easyToDragWidth / actualWidth else 1f
-
-                    ValueAnimator.ofFloat(draggingScaleRate, targetRate).apply {
-                        duration = 250
-                        addUpdateListener {
-                            draggingScaleRate = it.animatedValue as Float
-                        }
-                    }.start()
                 },
                 onDrag = { _: PointerInputChange, dragAmount: Offset ->
                     offset += dragAmount
@@ -207,7 +161,7 @@ fun Piece(
                     onDraggingItemChange.invoke(
                         DraggingItem(
                             position = currentRect.center + offset,
-                            width = actualWidth
+                            width = width,
                         )
                     )
                 },
@@ -215,45 +169,32 @@ fun Piece(
                     returnToOldPlace.invoke()
                     onDraggingItemChange.invoke(null)
 
-                    ValueAnimator.ofFloat(draggingScaleRate, 1f).apply {
-                        duration = 250
-                        addUpdateListener {
-                            draggingScaleRate = it.animatedValue as Float
-                        }
-                    }.start()
                 },
                 onDragCancel = {
                     returnToOldPlace.invoke()
                     onDraggingItemChange.invoke(null)
-                    ValueAnimator.ofFloat(draggingScaleRate, 1f).apply {
-                        duration = 250
-                        addUpdateListener {
-                            draggingScaleRate = it.animatedValue as Float
-                        }
-                    }.start()
                 }
             )
         }
         .offset { IntOffset(x = offset.x.roundToInt(), y = offset.y.roundToInt()) }
         .zIndex(if (flying) 1f else 0f)
         .graphicsLayer(
-            alpha = if (draggingInScope) 0.5f else 0.99f,
-            scaleX = draggingScaleRate)
+            alpha = if (draggingInScope) 0.5f else 0.99f)
 
     ) {
         AnimatedContent(targetState = selected, label = "") { halfAlpha ->
             Row(
                 modifier = Modifier
-                .alpha(if (halfAlpha) 0.2f else 1f)
-                .combinedClickable(
-                    onClick = {
-                        onClick.invoke()
-                    },
-                    onLongClick = {
-                        onLongClick.invoke()
-                    }
-                )
-                .width(actualWidth)
+                    .alpha(if (halfAlpha) 0.2f else 1f)
+                    .combinedClickable(
+                        onClick = {
+                            onClick.invoke()
+                        },
+                        onLongClick = {
+                            onLongClick.invoke()
+                        }
+                    )
+                    .width(actualWidth)
 
             ) {
 
@@ -275,4 +216,5 @@ fun Piece(
 
         }
     }
+
 }

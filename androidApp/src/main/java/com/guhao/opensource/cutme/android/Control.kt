@@ -354,7 +354,7 @@ fun Control(
     onTracksChange: (List<Track>) -> Unit,
 
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
-    controlState: ControlState = rememberControlState()
+    controlState: ControlState = rememberControlState(),
 ) {
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
     BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
@@ -414,13 +414,18 @@ fun Control(
             }
         }
 
-        val currentGlobalProgressInMillis = controlState.calCurrentMillis(totalDuration) // in milliseconds
-        Column(modifier = Modifier.align(Alignment.TopCenter)) {
-            ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
-            Spacer(modifier = Modifier.height(10.dp))
-            ProgressHintLine(modifier = Modifier.align(CenterHorizontally))
-        }
 
+        val currentGlobalProgressInMillis = controlState.calCurrentMillis(totalDuration) // in milliseconds
+
+        AnimatedVisibility(
+            modifier = Modifier.align(Alignment.TopCenter),
+            visible = draggingItem == null) {
+            Column {
+                ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
+                Spacer(modifier = Modifier.height(10.dp))
+                ProgressHintLine(modifier = Modifier.align(CenterHorizontally))
+            }
+        }
 
         BottomTools(modifier = Modifier
             .padding(30.dp)
