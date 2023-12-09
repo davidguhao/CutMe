@@ -69,6 +69,9 @@ class Piece(
 
     class NotInValidScope(msg: String): Exception(msg)
 }
+
+
+var draggingWidth = 0f
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -91,10 +94,11 @@ fun Piece(
     val pieceHeight = 70.dp
 
     var translationXForDrag by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current.density
     fun isInScope(randomPoint: Offset): Boolean {
         if(flying) return false
 
-        translationXForDrag.let {
+        (translationXForDrag * density).let {
             val coverCenter = Offset(
                 x = currentRect.center.x - it / 2,
                 y = currentRect.center.y
@@ -111,8 +115,7 @@ fun Piece(
 
     LaunchedEffect(key1 = draggingInScope) {
         val transTarget = if(draggingInScope) {
-            // draggingItem!!.width.value * zoom
-            20f
+            draggingItem!!.width.value
         } else 0f
 
         println("Current draggingItemWidth = $transTarget")
@@ -161,14 +164,14 @@ fun Piece(
                     onDraggingItemChange.invoke(
                         DraggingItem(
                             position = currentRect.center + offset,
-                            width = width,
+                            width = currentRect.width.toDp(),
                         )
                     )
+
                 },
                 onDragEnd = {
                     returnToOldPlace.invoke()
                     onDraggingItemChange.invoke(null)
-
                 },
                 onDragCancel = {
                     returnToOldPlace.invoke()
