@@ -109,6 +109,8 @@ fun Piece(
         draggingItem = draggingItem, enabled = !flying, onOffsetChange = onCompensationTranslationXChange) { shouldPadding ->
 
         var currentRect by remember { mutableStateOf(Rect.Zero) }
+        var currentCompensation by remember { mutableFloatStateOf(0f) }
+        currentCompensation = compensationTranslationX
         PieceCard(modifier = Modifier
             .onGloballyPositioned { currentRect = it.boundsInWindow() }
             .padding(start = shouldPadding)
@@ -121,7 +123,7 @@ fun Piece(
 
                         onDraggingItemChange.invoke(
                             DraggingItem(
-                                position = currentRect.center + draggingOffset,
+                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x - currentCompensation)},
                                 width = currentRect.width.toDp(),
                             )
                         )
