@@ -36,12 +36,6 @@ import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-
-data class DraggingItem(
-    val position: Offset,
-    val width: Dp,
-)
-
 class Piece(
     val model: Any?,
     val start: Long = 0, val end: Long) {
@@ -61,7 +55,6 @@ class Piece(
 }
 
 
-var draggingWidth = 0f
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -88,36 +81,27 @@ fun Piece(
 
     var translationXForDragDp by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current.density
-    fun isInScope(randomPoint: Offset): Boolean {
-        if(flying) return false
 
-        (translationXForDragDp * density).let {
-            val coverCenter = Offset(
-                x = currentRect.center.x - it / 2,
-                y = currentRect.center.y
-            )
+    val draggingInScope = draggingItem?.let { !flying && isInScope(
+        randomPoint = it.position,
 
-            val xInScope = abs(randomPoint.x - coverCenter.x) < (it + currentRect.width) / 2
-            val yInScope = abs(randomPoint.y - coverCenter.y) < currentRect.height / 2
+        center = currentRect.center,
+        width = currentRect.width,
+        height = currentRect.height,
 
-            return xInScope && yInScope
-        }
-    }
-
-    val draggingInScope = draggingItem?.let { isInScope(it.position) }?: false
+        offset = translationXForDragDp * density
+        ) }?: false
 
     LaunchedEffect(key1 = draggingInScope) {
         val transTarget = if(draggingInScope) {
             draggingItem!!.width.value
         } else 0f
 
-        println("Current draggingItemWidth = $transTarget")
         ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
             duration = 250
             addUpdateListener { animator ->
                 translationXForDragDp = animator.animatedValue as Float
                 onCompensationTranslationXChange.invoke(translationXForDragDp * density)
-                println("CurrentTransValue $translationXForDragDp")
             }
         }.start()
 

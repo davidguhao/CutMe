@@ -1,5 +1,7 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.ValueAnimator
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +12,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -18,8 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
@@ -93,7 +101,7 @@ fun Track(
                 }
             )
         }
-        AddPieceButton {
+        AddPieceButton(draggingItem = draggingItem) {
             requestAdding.invoke { result: List<SelectInfo> ->
                 onTrackChange(Track(track.pieces + result.map {
                     Piece(
@@ -103,16 +111,21 @@ fun Track(
         Spacer(modifier = Modifier.width((maxTrackLength / 2 - 48).dp))
     }
 }
-
 @Composable
-fun AddPieceButton(onClick: () -> Unit) {
-    IconButton(
-        modifier = Modifier.padding(vertical = 10.dp),
-        onClick = onClick,
-    ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "Add",
-            tint = Color.White)
+fun AddPieceButton(
+    draggingItem: DraggingItem?,
+    onClick: () -> Unit) {
+    DraggingItemDetector(draggingItem = draggingItem) {
+        IconButton(
+            modifier = Modifier
+                .padding(top = 10.dp, bottom = 10.dp, start = it),
+            onClick = onClick,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add",
+                tint = Color.White)
+        }
     }
+
 }
