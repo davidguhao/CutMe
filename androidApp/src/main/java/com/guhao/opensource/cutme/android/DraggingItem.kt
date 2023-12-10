@@ -22,6 +22,9 @@ import kotlin.math.abs
 data class DraggingItem(
     val position: Offset,
     val width: Dp,
+
+    val pieceIndex: Int = -1,
+    val trackIndex: Int = -1,
 )
 
 fun isInScope(
@@ -51,6 +54,7 @@ fun DraggingItemDetector(
     draggingItem: DraggingItem?,
 
     onOffsetChange: (Float) -> Unit = {},
+    onDraggingInScopeChange: (Boolean) -> Unit,
 
     block: @Composable (Dp) -> Unit
 ) {
@@ -68,6 +72,7 @@ fun DraggingItemDetector(
         offset = translationXForDragDp * density
     ) }?: false
     LaunchedEffect(key1 = draggingInScope) {
+        onDraggingInScopeChange(draggingInScope)
         val transTarget = if(draggingInScope) {
             draggingItem!!.width.value
         } else 0f

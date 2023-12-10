@@ -69,6 +69,44 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
+
+fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>): List<Track> {
+    return ArrayList(this).apply {
+        val piece = this[initialPos.first].pieces[initialPos.second]
+
+        fun deleteOld() {
+            this[initialPos.first] = Track(pieces = ArrayList(this[initialPos.first].pieces).apply {
+                removeAt(initialPos.second)
+            })
+        }
+        fun addNew() {
+            val targetTrackIndex = targetPosition.first
+            val targetPieceIndex = targetPosition.second
+            if(targetTrackIndex == -1) {
+                add(Track(pieces = listOf(piece)))
+            } else {
+                set(targetTrackIndex, Track(pieces = ArrayList(this[targetTrackIndex].pieces).apply {
+                    if(targetPieceIndex == -1) {
+                        add(piece)
+                    } else {
+                        add(targetPieceIndex, piece)
+                    }
+                }))
+            }
+        }
+
+        if(initialPos.first != targetPosition.first) {
+            deleteOld(); addNew()
+        } else {
+            if(initialPos.second < targetPosition.second) {
+                addNew(); deleteOld()
+            } else {
+                deleteOld(); addNew()
+            }
+        }
+    }
+}
+
 fun PointerEvent.isPointerUp(pointerId: PointerId): Boolean =
     changes.firstOrNull { it.id == pointerId }?.pressed != true
 suspend fun AwaitPointerEventScope.awaitLongPressOrCancellationMine(
@@ -362,6 +400,7 @@ fun Control(
     }
 
     var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
+    var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     var zoom by remember { mutableFloatStateOf(1f) }
     ZoomBox(
@@ -374,6 +413,8 @@ fun Control(
     ) {
         val horizontalScrollState = controlState.progressState
         val totalDuration = tracks.longestDuration()
+
+        val inScopeTrackSet = remember { HashSet<Int>() }
 
         LazyColumn(
             modifier = Modifier
@@ -407,9 +448,32 @@ fun Control(
                     },
                     totalDuration = totalDuration,
                     draggingItem = draggingItem,
-                    onDraggingItemChange = {
-                        draggingItem = it
-                    }
+                    onDraggingItemChange = { reason, item ->
+
+                        if(reason != DraggingItemChangeReason.UPDATE) {
+                            // Currently the 'item' will be null, don't use it.
+                            currentDroppingTarget?.let { targetPos ->
+                                val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
+
+                                onTracksChange.invoke(tracks.move(initialPos, targetPos))
+                            }
+                        }
+
+                        draggingItem = item?.copy(trackIndex = tracks.indexOf(track))
+                    },
+                    onDraggingInScope = { pieceIndex ->
+                        tracks.indexOf(track).let { trackIndex ->
+                            currentDroppingTarget = Pair(trackIndex, pieceIndex)
+                            inScopeTrackSet.add(trackIndex)
+                        }
+                    },
+                    onInScopePiecesClear = {
+                        inScopeTrackSet.remove(tracks.indexOf(track))
+                        if(inScopeTrackSet.isEmpty()) {
+                            currentDroppingTarget = null
+                        }
+                    },
+                    draggingHasTarget = { currentDroppingTarget != null }
                 )
             }
         }

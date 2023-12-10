@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +43,11 @@ fun Track(
     totalDuration: Long,
 
     draggingItem: DraggingItem?,
-    onDraggingItemChange: (DraggingItem?) -> Unit
+    onDraggingItemChange: (DraggingItemChangeReason, DraggingItem?) -> Unit,
+
+    onDraggingInScope: (Int) -> Unit,
+    onInScopePiecesClear: () -> Unit,
+    draggingHasTarget: () -> Boolean
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -58,6 +63,7 @@ fun Track(
         Spacer(modifier = Modifier.width((maxTrackLength / 2).dp))
 
         val compensationMap = remember { mutableStateListOf<Pair<Int, Float>>() }
+        val inScopePieceSet = remember { HashSet<Int>() }
 
         track.pieces.forEachIndexed { index, piece ->
 
@@ -79,7 +85,9 @@ fun Track(
                     onSelectedSetChange(setOf())
                 },
                 draggingItem = draggingItem,
-                onDraggingItemChange = onDraggingItemChange,
+                onDraggingItemChange = { reason, item ->
+                    onDraggingItemChange.invoke(reason, item?.copy(pieceIndex = index))
+                },
                 compensationTranslationX = compensationMap.filter { it.first < index }.map { it.second }.sum(),
                 onCompensationTranslationXChange = { x ->
                     compensationMap.apply {
@@ -91,10 +99,31 @@ fun Track(
                             add(ready)
                     }
                 },
-                draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap.put(index, it) }
+                draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap.put(index, it) },
+                onDraggingInScopeChange = {
+                    if(it) {
+                        onDraggingInScope.invoke(index)
+                        inScopePieceSet.add(index)
+                    } else {
+                        inScopePieceSet.remove(index)
+                        if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
+                    }
+                },
+                draggingHasTarget = draggingHasTarget
             )
         }
-        AddPieceButton(draggingItem = draggingItem) {
+        AddPieceButton(
+            draggingItem = draggingItem,
+            onDraggingInScopeChange = {
+                if(it) {
+                    onDraggingInScope.invoke(-1) // Use -1 to indicate adding to the end
+                    inScopePieceSet.add(-1)
+                } else {
+                    inScopePieceSet.remove(-1)
+                    if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
+                }
+            }
+        ) {
             requestAdding.invoke { result: List<SelectInfo> ->
                 onTrackChange(Track(track.pieces + result.map {
                     Piece(
@@ -107,8 +136,12 @@ fun Track(
 @Composable
 fun AddPieceButton(
     draggingItem: DraggingItem?,
-    onClick: () -> Unit) {
-    DraggingItemDetector(draggingItem = draggingItem) {
+    onDraggingInScopeChange: (Boolean) -> Unit,
+    onClick: () -> Unit
+) {
+    DraggingItemDetector(
+        draggingItem = draggingItem,
+        onDraggingInScopeChange = onDraggingInScopeChange) {
         IconButton(
             modifier = Modifier
                 .padding(top = 10.dp, bottom = 10.dp, start = it),

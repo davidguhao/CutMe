@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,14 +27,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -56,6 +54,9 @@ class Piece(
 }
 
 
+enum class DraggingItemChangeReason {
+    UPDATE, END, CANCEL
+}
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -68,12 +69,14 @@ fun Piece(
     zoom: Float = 1f,
 
     draggingItem: DraggingItem?,
-    onDraggingItemChange: (DraggingItem?) -> Unit,
+    onDraggingItemChange: (DraggingItemChangeReason, DraggingItem?) -> Unit,
 
     compensationTranslationX: Float,
     onCompensationTranslationXChange: (Float) -> Unit,
 
-    draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) }
+    draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) },
+    onDraggingInScopeChange: (Boolean) -> Unit,
+    draggingHasTarget: () -> Boolean
 ) {
     var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
@@ -106,7 +109,11 @@ fun Piece(
         modifier = Modifier
             .zIndex(if (flying) 1f else 0f),
 
-        draggingItem = draggingItem, enabled = !flying, onOffsetChange = onCompensationTranslationXChange) { shouldPadding ->
+        draggingItem = draggingItem,
+        enabled = !flying,
+        onOffsetChange = onCompensationTranslationXChange,
+        onDraggingInScopeChange = onDraggingInScopeChange
+    ) { shouldPadding ->
 
         var currentRect by remember { mutableStateOf(Rect.Zero) }
         var currentCompensation by remember { mutableFloatStateOf(0f) }
@@ -122,6 +129,7 @@ fun Piece(
                         draggingOffset += dragAmount
 
                         onDraggingItemChange.invoke(
+                            DraggingItemChangeReason.UPDATE,
                             DraggingItem(
                                 position = currentRect.center + draggingOffset.let { it.copy(x = it.x - currentCompensation)},
                                 width = currentRect.width.toDp(),
@@ -131,11 +139,15 @@ fun Piece(
                     },
                     onDragEnd = {
                         returnToOldPlace.invoke()
-                        onDraggingItemChange.invoke(null)
+                        if(!draggingHasTarget.invoke() || true) onDraggingItemChange.invoke(
+                            DraggingItemChangeReason.END,
+                            null)
                     },
                     onDragCancel = {
                         returnToOldPlace.invoke()
-                        onDraggingItemChange.invoke(null)
+                        onDraggingItemChange.invoke(
+                            DraggingItemChangeReason.CANCEL,
+                            null)
                     }
                 )
             }
