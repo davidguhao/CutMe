@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,43 +71,16 @@ fun Piece(
     onDraggingItemChange: (DraggingItem?) -> Unit,
 
     compensationTranslationX: Float,
-    onCompensationTranslationXChange: (Float) -> Unit
+    onCompensationTranslationXChange: (Float) -> Unit,
+
+    draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) }
 ) {
-    var draggingOffset by remember { mutableStateOf(Offset.Zero) }
+    var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
-    var currentRect by remember { mutableStateOf(Rect.Zero) }
 
     val actualWidth = width * zoom
     val pieceHeight = 70.dp
 
-    var translationXForDragDp by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current.density
-
-    val draggingInScope = draggingItem?.let { !flying && isInScope(
-        randomPoint = it.position,
-
-        center = currentRect.center,
-        width = currentRect.width,
-        height = currentRect.height,
-
-        offset = translationXForDragDp * density
-        ) }?: false
-
-    LaunchedEffect(key1 = draggingInScope) {
-        val transTarget = if(draggingInScope) {
-            draggingItem!!.width.value
-        } else 0f
-
-        ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
-            duration = 250
-            addUpdateListener { animator ->
-                translationXForDragDp = animator.animatedValue as Float
-                onCompensationTranslationXChange.invoke(translationXForDragDp * density)
-            }
-        }.start()
-
-
-    }
     val returnToOldPlace = {
         ValueAnimator
             .ofFloat(draggingOffset.x, 0f)
@@ -128,76 +102,84 @@ fun Piece(
             .start()
     }
 
-    PieceCard(modifier = Modifier
-        .padding(start = translationXForDragDp.dp)
-        .onGloballyPositioned { layoutCoordinates ->
-            currentRect = layoutCoordinates.boundsInWindow()
-        }
-        .pointerInput(Unit) {
-            dragGesturesAfterLongPress(
+    DraggingItemDetector(
+        modifier = Modifier
+            .zIndex(if (flying) 1f else 0f),
 
-                onDragStart = {
-                },
-                onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                    draggingOffset += dragAmount
+        draggingItem = draggingItem, enabled = !flying, onOffsetChange = onCompensationTranslationXChange) { shouldPadding ->
 
-                    onDraggingItemChange.invoke(
-                        DraggingItem(
-                            position = currentRect.center + draggingOffset,
-                            width = currentRect.width.toDp(),
+        var currentRect by remember { mutableStateOf(Rect.Zero) }
+        PieceCard(modifier = Modifier
+            .onGloballyPositioned { currentRect = it.boundsInWindow() }
+            .padding(start = shouldPadding)
+            .pointerInput(Unit) {
+                dragGesturesAfterLongPress(
+                    onDragStart = {
+                    },
+                    onDrag = { _: PointerInputChange, dragAmount: Offset ->
+                        draggingOffset += dragAmount
+
+                        onDraggingItemChange.invoke(
+                            DraggingItem(
+                                position = currentRect.center + draggingOffset,
+                                width = currentRect.width.toDp(),
+                            )
                         )
-                    )
 
-                },
-                onDragEnd = {
-                    returnToOldPlace.invoke()
-                    onDraggingItemChange.invoke(null)
-                },
-                onDragCancel = {
-                    returnToOldPlace.invoke()
-                    onDraggingItemChange.invoke(null)
-                }
-            )
-        }
-        .offset { IntOffset(x = (draggingOffset.x - if(flying) compensationTranslationX else 0f).roundToInt(), y = draggingOffset.y.roundToInt()) } // Pixel
-        .zIndex(if (flying) 1f else 0f)
-        .graphicsLayer(
-            alpha = 0.99f)
-
-    ) {
-        AnimatedContent(targetState = selected, label = "") { halfAlpha ->
-            Row(
-                modifier = Modifier
-                    .alpha(if (halfAlpha) 0.2f else 1f)
-                    .combinedClickable(
-                        onClick = {
-                            onClick.invoke()
-                        },
-                        onLongClick = {
-                            onLongClick.invoke()
-                        }
-                    )
-                    .width(actualWidth)
-
-            ) {
-
-                val expectingWidthForEachFrame = 40
-                val nFrameShouldShow = (actualWidth.value / expectingWidthForEachFrame).toInt().let { if(it == 0) 1 else it}
-
-                for(i in 0 until nFrameShouldShow) GlideImage(
-                    modifier = Modifier
-                        .height(pieceHeight)
-                        .width(actualWidth / nFrameShouldShow),
-                    contentScale = ContentScale.Crop,
-                    model = piece.model,
-                    contentDescription = "",
-                    requestBuilderTransform = {
-                        it.frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
+                    },
+                    onDragEnd = {
+                        returnToOldPlace.invoke()
+                        onDraggingItemChange.invoke(null)
+                    },
+                    onDragCancel = {
+                        returnToOldPlace.invoke()
+                        onDraggingItemChange.invoke(null)
                     }
                 )
             }
+            .offset {
+                IntOffset(
+                    x = (draggingOffset.x - if (flying) compensationTranslationX else 0f).roundToInt(),
+                    y = draggingOffset.y.roundToInt()
+                )
+            } // Pixel
+            .graphicsLayer(
+                alpha = 0.99f
+            )
+        ) {
+            AnimatedContent(targetState = selected, label = "") { halfAlpha ->
+                Row(
+                    modifier = Modifier
+                        .alpha(if (halfAlpha) 0.2f else 1f)
+                        .combinedClickable(
+                            onClick = {
+                                onClick.invoke()
+                            },
+                            onLongClick = {
+                                onLongClick.invoke()
+                            }
+                        )
+                        .width(actualWidth)
 
+                ) {
+
+                    val expectingWidthForEachFrame = 40
+                    val nFrameShouldShow = (actualWidth.value / expectingWidthForEachFrame).toInt().let { if(it == 0) 1 else it}
+
+                    for(i in 0 until nFrameShouldShow) GlideImage(
+                        modifier = Modifier
+                            .height(pieceHeight)
+                            .width(actualWidth / nFrameShouldShow),
+                        contentScale = ContentScale.Crop,
+                        model = piece.model,
+                        contentDescription = "",
+                        requestBuilderTransform = {
+                            it.frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
+                        }
+                    )
+                }
+
+            }
         }
     }
-
 }
