@@ -46,6 +46,7 @@ import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -235,20 +236,26 @@ fun Piece(
 
     draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) },
     onDraggingInScopeChange: (Boolean) -> Unit,
-    enableDraggingDetector: Boolean
+    enableDraggingDetector: Boolean,
+
+    shouldAnimateDraggingItemBack: () -> Boolean
 ) {
     var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
 
     val actualWidth = width * zoom
 
+    var alpha by remember { mutableFloatStateOf(1f) }
     val returnToOldPlace = {
+        alpha = if(shouldAnimateDraggingItemBack.invoke()) 1f else 0f
+
         ValueAnimator
             .ofFloat(draggingOffset.x, 0f)
             .apply {
                 duration = 250
                 addUpdateListener {
                     draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
+                    if(abs(draggingOffset.x) < 1f && abs(draggingOffset.y) < 1f) alpha = 1f
                 }
             }
             .start()
@@ -258,6 +265,7 @@ fun Piece(
                 duration = 250
                 addUpdateListener {
                     draggingOffset = draggingOffset.copy(y = it.animatedValue as Float)
+                    if(abs(draggingOffset.x) < 1f && abs(draggingOffset.y) < 1f) alpha = 1f
                 }
             }
             .start()
@@ -265,7 +273,7 @@ fun Piece(
 
     DraggingItemDetector(
         modifier = Modifier
-            .zIndex(if (flying) 1f else 0f),
+            .zIndex(if (flying) 1f else 0f).alpha(alpha),
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,

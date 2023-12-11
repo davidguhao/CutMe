@@ -47,6 +47,8 @@ fun Track(
 
     onDraggingInScope: (Int) -> Unit,
     onInScopePiecesClear: () -> Unit,
+
+    shouldAnimateDraggingItemBack: () -> Boolean
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -114,7 +116,9 @@ fun Track(
                         if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
                     }
                 },
-                enableDraggingDetector = currentDraggingIndex?.let { index != it + 1 } ?: true
+                enableDraggingDetector = currentDraggingIndex?.let { index != it + 1 } ?: true,
+
+                shouldAnimateDraggingItemBack = shouldAnimateDraggingItemBack
             )
         }
         AddPieceButton(

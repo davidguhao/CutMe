@@ -336,6 +336,7 @@ fun Control(
                             currentDroppingTarget = null
                         }
                     },
+                    shouldAnimateDraggingItemBack = { currentDroppingTarget == null }
                 )
             }
 
