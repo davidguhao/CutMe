@@ -4,7 +4,6 @@ import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
@@ -91,8 +90,8 @@ class SelectIngredientsActivity: ComponentActivity() {
                     list.add(SelectInfo(
                         path = it.getString(it.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)),
                         duration = it.getLong(it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)),
-                        width = it.getInt(it.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)),
-                        height = it.getInt(it.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT))
+//                        width = it.getInt(it.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)),
+//                        height = it.getInt(it.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT))
                     ))
                 }
         }
@@ -143,11 +142,8 @@ class SelectIngredientsActivity: ComponentActivity() {
 
 class SelectInfo(
     val path: String,
-    val dateModified: Long = 0, // todo
+    //val dateModified: Long = 0, // todo
     val duration: Long? = null, // In milli seconds
-
-    val width: Int = 0,
-    val height: Int = 0,
 ): Serializable
 
 val contentScale = object: ContentScale {

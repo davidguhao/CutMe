@@ -1,6 +1,5 @@
 package com.guhao.opensource.cutme.android
 
-import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -69,7 +68,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-
 fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>): List<Track> {
     return ArrayList(this).apply {
         val piece = this[initialPos.first].pieces[initialPos.second]
@@ -82,16 +80,19 @@ fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>)
         fun addNew() {
             val targetTrackIndex = targetPosition.first
             val targetPieceIndex = targetPosition.second
-            if(targetTrackIndex == -1) {
+            if(targetTrackIndex < 0 || targetTrackIndex >= size) {
                 add(Track(pieces = listOf(piece)))
             } else {
-                set(targetTrackIndex, Track(pieces = ArrayList(this[targetTrackIndex].pieces).apply {
-                    if(targetPieceIndex == -1) {
-                        add(piece)
-                    } else {
-                        add(targetPieceIndex, piece)
-                    }
-                }))
+                set(
+                    targetTrackIndex,
+                    Track(pieces = ArrayList(this[targetTrackIndex].pieces).apply {
+                        if (targetPieceIndex < 0 || targetPieceIndex >= size) {
+                            add(piece)
+                        } else {
+                            add(targetPieceIndex, piece)
+                        }
+                    })
+                )
             }
         }
 
@@ -438,14 +439,14 @@ fun Control(
                     requestAdding = requestAdding,
 
                     zoom = zoom,
-                    onZoomChange = { expectedZoom: Float ->
-                        ValueAnimator.ofFloat(zoom, expectedZoom).apply {
-                            duration = 1000
-                            addUpdateListener {
-                                zoom = it.animatedValue as Float
-                            }
-                        }.start()
-                    },
+//                    onZoomChange = { expectedZoom: Float ->
+//                        ValueAnimator.ofFloat(zoom, expectedZoom).apply {
+//                            duration = 1000
+//                            addUpdateListener {
+//                                zoom = it.animatedValue as Float
+//                            }
+//                        }.start()
+//                    },
                     totalDuration = totalDuration,
                     draggingItem = draggingItem,
                     onDraggingItemChange = { reason, item ->
@@ -473,7 +474,6 @@ fun Control(
                             currentDroppingTarget = null
                         }
                     },
-                    draggingHasTarget = { currentDroppingTarget != null }
                 )
             }
         }

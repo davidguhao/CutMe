@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -76,7 +75,7 @@ fun Piece(
 
     draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) },
     onDraggingInScopeChange: (Boolean) -> Unit,
-    draggingHasTarget: () -> Boolean
+    enableDraggingDetector: Boolean
 ) {
     var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
@@ -110,7 +109,7 @@ fun Piece(
             .zIndex(if (flying) 1f else 0f),
 
         draggingItem = draggingItem,
-        enabled = !flying,
+        enabled = enableDraggingDetector && !flying,
         onOffsetChange = onCompensationTranslationXChange,
         onDraggingInScopeChange = onDraggingInScopeChange
     ) { shouldPadding ->
@@ -139,7 +138,7 @@ fun Piece(
                     },
                     onDragEnd = {
                         returnToOldPlace.invoke()
-                        if(!draggingHasTarget.invoke() || true) onDraggingItemChange.invoke(
+                        onDraggingItemChange.invoke(
                             DraggingItemChangeReason.END,
                             null)
                     },
