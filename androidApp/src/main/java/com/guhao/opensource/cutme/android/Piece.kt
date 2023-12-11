@@ -4,6 +4,8 @@ import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -21,8 +23,19 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.isOutOfBounds
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -32,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 
 class Piece(
@@ -55,6 +69,149 @@ class Piece(
 
 enum class DraggingItemChangeReason {
     UPDATE, END, CANCEL
+}
+fun PointerEvent.isPointerUp(pointerId: PointerId): Boolean =
+    changes.firstOrNull { it.id == pointerId }?.pressed != true
+suspend fun AwaitPointerEventScope.awaitLongPressOrCancellationMine(
+    pointerId: PointerId
+): PointerInputChange? {
+    if (currentEvent.isPointerUp(pointerId)) {
+        return null // The pointer has already been lifted, so the long press is cancelled.
+    }
+
+    val initialDown =
+        currentEvent.changes.firstOrNull { it.id == pointerId } ?: return null
+
+    var longPress: PointerInputChange? = null
+    var currentDown = initialDown
+    val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+    return try {
+        // wait for first tap up or long press
+        withTimeout(longPressTimeout) {
+            var finished = false
+            while (!finished) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.all { it.changedToUpIgnoreConsumed() }) {
+                    // All pointers are up
+                    finished = true
+                }
+
+                if (
+                    event.changes.any {
+                        it.isConsumed || it.isOutOfBounds(size, extendedTouchPadding)
+                    }
+                ) {
+                    finished = true // Canceled
+                }
+
+                // Check for cancel by position consumption. We can look on the Final pass of
+                // the existing pointer event because it comes after the Main pass we checked
+                // above.
+                val consumeCheck = awaitPointerEvent(PointerEventPass.Final)
+                if (consumeCheck.changes.any { it.isConsumed }) {
+                    finished = true
+                }
+                if (event.isPointerUp(currentDown.id)) {
+                    val newPressed = event.changes.firstOrNull { it.pressed }
+                    if (newPressed != null) {
+                        currentDown = newPressed
+                        longPress = currentDown
+                    } else {
+                        // should technically never happen as we checked it above
+                        finished = true
+                    }
+                    // Pointer (id) stayed down.
+                } else {
+                    longPress = event.changes.firstOrNull { it.id == currentDown.id }
+                }
+            }
+        }
+        null
+    } catch (_: PointerEventTimeoutCancellationException) {
+        longPress ?: initialDown
+    }
+}
+
+
+suspend inline fun AwaitPointerEventScope.awaitDragOrUpMine(
+    pointerId: PointerId,
+    hasDragged: (PointerInputChange) -> Boolean
+): PointerInputChange? {
+    var pointer = pointerId
+    while (true) {
+        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+        val dragEvent = event.changes.firstOrNull { it.id == pointer } ?: return null
+        if (dragEvent.changedToUpIgnoreConsumed()) {
+            val otherDown = event.changes.firstOrNull { it.pressed }
+            if (otherDown == null) {
+                // This is the last "up"
+                return dragEvent
+            } else {
+                pointer = otherDown.id
+            }
+        } else if (hasDragged(dragEvent)) {
+            return dragEvent
+        }
+    }
+}
+suspend fun AwaitPointerEventScope.awaitDragOrCancellationMine(
+    pointerId: PointerId,
+): PointerInputChange? {
+    if (currentEvent.isPointerUp(pointerId)) {
+        return null // The pointer has already been lifted, so the gesture is canceled
+    }
+    val change = awaitDragOrUpMine(pointerId) { it.positionChangedIgnoreConsumed() }
+    return if (change?.isConsumed == false) change else null
+}
+
+suspend fun AwaitPointerEventScope.dragMine(
+    pointerId: PointerId,
+    onDrag: (PointerInputChange) -> Unit
+): Boolean {
+    var pointer = pointerId
+    while (true) {
+        val change = awaitDragOrCancellationMine(pointer) ?: return false
+
+        if (change.changedToUpIgnoreConsumed()) {
+            return true
+        }
+
+        onDrag(change)
+        pointer = change.id
+    }
+}
+suspend fun PointerInputScope.dragGesturesAfterLongPress(
+    onDragStart: (Offset) -> Unit = { },
+    onDragEnd: () -> Unit = { },
+    onDragCancel: () -> Unit = { },
+    onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit
+) {
+    awaitEachGesture {
+        try {
+            val down = awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Initial)
+            val drag = awaitLongPressOrCancellationMine(down.id)
+            if (drag != null) {
+                onDragStart.invoke(drag.position)
+                if (
+                    dragMine(drag.id) {
+                        onDrag(it, it.positionChange())
+                        it.consume()
+                    }
+                ) {
+                    // consume up if we quit drag gracefully with the up
+                    currentEvent.changes.forEach {
+                        if (it.changedToUp()) it.consume()
+                    }
+                    onDragEnd()
+                } else {
+                    onDragCancel()
+                }
+            }
+        } catch (c: CancellationException) {
+            onDragCancel()
+            throw c
+        }
+    }
 }
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
