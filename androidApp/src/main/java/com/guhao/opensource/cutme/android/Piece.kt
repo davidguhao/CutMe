@@ -213,6 +213,9 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
         }
     }
 }
+
+val pieceHeight = 70.dp
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -238,7 +241,6 @@ fun Piece(
     val flying = draggingOffset != Offset.Zero
 
     val actualWidth = width * zoom
-    val pieceHeight = 70.dp
 
     val returnToOldPlace = {
         ValueAnimator

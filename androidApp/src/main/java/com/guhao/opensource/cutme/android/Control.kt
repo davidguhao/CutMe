@@ -1,11 +1,13 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -19,10 +21,13 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,8 +39,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,12 +56,17 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.guhao.opensource.cutme.millisTimeFormat
 import com.guhao.opensource.cutme.millisTimeStandardFormat
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>): List<Track> {
@@ -272,9 +284,7 @@ fun Control(
                     track = track,
                     onTrackChange = { it: Track ->
                         onTracksChange.invoke(ArrayList(tracks).apply {
-                            val index = indexOf(track)
-                            this[index] = it
-                            if(index == lastIndex) add(Track(listOf()))
+                            this[indexOf(track)] = it
                         })
                     },
 
@@ -321,6 +331,69 @@ fun Control(
                     },
                 )
             }
+
+            item {
+                val density = LocalDensity.current.density
+                val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+
+                var inScope by remember { mutableStateOf(false) }
+                var offset by remember { mutableIntStateOf(0) }
+                LaunchedEffect(key1 = inScope) {
+                    if(inScope) ValueAnimator.ofInt(0, (screenWidth.value * density).roundToInt()).apply {
+                        duration = 250
+                        addUpdateListener {
+                            offset = it.animatedValue as Int
+                        }
+                    }.start()
+                }
+
+                DraggingItemDetector2(
+                    modifier = Modifier
+                        .padding(start = (horizontalScrollState.value / density).dp)
+                        .width(screenWidth)
+                        .height(pieceHeight),
+                    draggingItem = draggingItem,
+                    onDraggingInScopeChange = {
+                        inScope = it
+
+                        val trackIndex = tracks.size
+
+                        if(it) {
+                            currentDroppingTarget = Pair(trackIndex, 0)
+                            inScopeTrackSet.add(trackIndex)
+                        } else {
+                            inScopeTrackSet.remove(trackIndex)
+                            if(inScopeTrackSet.isEmpty()) {
+                                currentDroppingTarget = null
+                            }
+                        }
+                    }
+                ) {
+                    AnimatedVisibility(
+                        enter = fadeIn(), exit = fadeOut(),
+                        visible = inScope
+                    ) {
+                        Row(
+                            modifier = Modifier.offset { IntOffset(x = (screenWidth.value * density - offset).roundToInt(), y = 0) }
+                        ) {
+                            (0 until 4).forEach { _ ->
+                                PieceCard(
+                                    modifier = Modifier
+                                        .alpha(0.5f)
+                                        .width((screenWidth.value / 4).dp)
+                                        .height(pieceHeight)
+                                        .background(color = Color.White)
+                                ) {
+                                }
+                            }
+                        }
+
+
+                    }
+
+                }
+
+            }
         }
 
 
@@ -328,6 +401,7 @@ fun Control(
 
         AnimatedVisibility(
             modifier = Modifier.align(Alignment.TopCenter),
+            enter = fadeIn(), exit = fadeOut(),
             visible = draggingItem == null) {
             Column {
                 ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
@@ -417,7 +491,7 @@ fun BottomTools(
                             if(newPieces.isNotEmpty()) add(Track(newPieces))
                         }
 
-                        if(isEmpty() || last().pieces.isNotEmpty()) add(Track(listOf()))
+                        if(isEmpty()) add(Track(listOf()))
                     })
 
                     onSelectedPiecesSetChange(setOf())
@@ -449,6 +523,7 @@ fun BottomTools(
                                         }
                                     )
                                 }
+
                             } catch(e: Piece.NotInValidScope) {
                                 e.printStackTrace()
                             }
