@@ -5,6 +5,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -74,9 +76,11 @@ fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>)
         val piece = this[initialPos.first].pieces[initialPos.second]
 
         fun deleteOld() {
-            this[initialPos.first] = Track(pieces = ArrayList(this[initialPos.first].pieces).apply {
-                removeAt(initialPos.second)
-            })
+
+            val newPieces = ArrayList(this[initialPos.first].pieces)
+            newPieces.removeAt(initialPos.second)
+
+            this[initialPos.first] = Track(pieces = newPieces)
         }
         fun addNew() {
             val targetTrackIndex = targetPosition.first
@@ -84,16 +88,15 @@ fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>)
             if(targetTrackIndex < 0 || targetTrackIndex >= size) {
                 add(Track(pieces = listOf(piece)))
             } else {
-                set(
-                    targetTrackIndex,
-                    Track(pieces = ArrayList(this[targetTrackIndex].pieces).apply {
-                        if (targetPieceIndex < 0 || targetPieceIndex >= size) {
-                            add(piece)
-                        } else {
-                            add(targetPieceIndex, piece)
-                        }
-                    })
-                )
+                val newPieces = ArrayList(this[targetTrackIndex].pieces)
+
+                if (targetPieceIndex < 0 || targetPieceIndex >= size) {
+                    newPieces.add(piece)
+                } else {
+                    newPieces.add(targetPieceIndex, piece)
+                }
+
+                set(targetTrackIndex, Track(pieces = newPieces))
             }
         }
 
@@ -261,6 +264,10 @@ fun Control(
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     var zoom by remember { mutableFloatStateOf(1f) }
+
+    val currentTracks by remember { mutableStateOf<List<Track>>(listOf()) }.also {
+        it.value = tracks
+    }
     ZoomBox(
         modifier = modifier,
         onTouch = {
@@ -280,6 +287,8 @@ fun Control(
                 .fillMaxSize()
                 .horizontalScroll(horizontalScrollState)) {
             items(items = tracks) { track ->
+                val trackIndex = tracks.indexOf(track)
+
                 Track(
                     track = track,
                     onTrackChange = { it: Track ->
@@ -311,20 +320,18 @@ fun Control(
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
 
-                                onTracksChange.invoke(tracks.move(initialPos, targetPos))
+                                onTracksChange.invoke(currentTracks.move(initialPos, targetPos))
                             }
                         }
 
-                        draggingItem = item?.copy(trackIndex = tracks.indexOf(track))
+                        draggingItem = item?.copy(trackIndex = trackIndex)
                     },
                     onDraggingInScope = { pieceIndex ->
-                        tracks.indexOf(track).let { trackIndex ->
-                            currentDroppingTarget = Pair(trackIndex, pieceIndex)
-                            inScopeTrackSet.add(trackIndex)
-                        }
+                        currentDroppingTarget = Pair(trackIndex, pieceIndex)
+                        inScopeTrackSet.add(trackIndex)
                     },
                     onInScopePiecesClear = {
-                        inScopeTrackSet.remove(tracks.indexOf(track))
+                        inScopeTrackSet.remove(trackIndex)
                         if(inScopeTrackSet.isEmpty()) {
                             currentDroppingTarget = null
                         }
@@ -379,7 +386,7 @@ fun Control(
                             (0 until 4).forEach { _ ->
                                 PieceCard(
                                     modifier = Modifier
-                                        .alpha(0.5f)
+                                        .alpha(0.2f)
                                         .width((screenWidth.value / 4).dp)
                                         .height(pieceHeight)
                                         .background(color = Color.White)
@@ -401,7 +408,7 @@ fun Control(
 
         AnimatedVisibility(
             modifier = Modifier.align(Alignment.TopCenter),
-            enter = fadeIn(), exit = fadeOut(),
+            enter = scaleIn(), exit = scaleOut(),
             visible = draggingItem == null) {
             Column {
                 ProgressHintText(modifier = Modifier.align(CenterHorizontally), current = currentGlobalProgressInMillis)
