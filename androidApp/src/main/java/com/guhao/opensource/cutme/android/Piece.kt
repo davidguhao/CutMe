@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -273,7 +274,8 @@ fun Piece(
 
     DraggingItemDetector(
         modifier = Modifier
-            .zIndex(if (flying) 1f else 0f).alpha(alpha),
+            .zIndex(if (flying) 1f else 0f)
+            .alpha(alpha),
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,
@@ -284,6 +286,20 @@ fun Piece(
         var currentRect by remember { mutableStateOf(Rect.Zero) }
         var currentCompensation by remember { mutableFloatStateOf(0f) }
         currentCompensation = compensationTranslationX
+        var scale by remember { mutableFloatStateOf(1f) }
+        LaunchedEffect(key1 = selected) {
+            if(selected) {
+                ValueAnimator.ofFloat(scale, 0.9f).apply {
+                    duration = 100
+                    addUpdateListener { scale = it.animatedValue as Float }
+                }.start()
+            } else {
+                ValueAnimator.ofFloat(scale, 1f).apply {
+                    duration = 100
+                    addUpdateListener { scale = it.animatedValue as Float }
+                }.start()
+            }
+        }
         PieceCard(modifier = Modifier
             .onGloballyPositioned { currentRect = it.boundsInWindow() }
             .padding(start = shouldPadding)
@@ -297,7 +313,7 @@ fun Piece(
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.UPDATE,
                             DraggingItem(
-                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x - currentCompensation)},
+                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x - currentCompensation) },
                                 width = currentRect.width.toDp(),
                             )
                         )
@@ -307,13 +323,15 @@ fun Piece(
                         returnToOldPlace.invoke()
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.END,
-                            null)
+                            null
+                        )
                     },
                     onDragCancel = {
                         returnToOldPlace.invoke()
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.CANCEL,
-                            null)
+                            null
+                        )
                     }
                 )
             }
@@ -324,7 +342,9 @@ fun Piece(
                 )
             } // Pixel
             .graphicsLayer(
-                alpha = 0.99f
+                alpha = 0.99f,
+                scaleX = scale,
+                scaleY = scale
             )
         ) {
             AnimatedContent(targetState = selected, label = "") { halfAlpha ->
@@ -340,7 +360,6 @@ fun Piece(
                             }
                         )
                         .width(actualWidth)
-
                 ) {
 
                     val expectingWidthForEachFrame = 40
