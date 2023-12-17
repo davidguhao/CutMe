@@ -366,7 +366,7 @@ fun Control(
                             modifier = Modifier
                                 .alpha(0.5f)
                                 .padding(start = startAndEndPaddingDp.dp)
-                                .width(blankPieceWidthDp.dp * zoom)
+                                .width(blankPieceWidthDp.dp)
                                 .height(pieceHeight),
                         ) {}
                     }
