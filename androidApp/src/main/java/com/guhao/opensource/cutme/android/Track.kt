@@ -130,7 +130,8 @@ fun Track(
                     inScopePieceSet.remove(-1)
                     if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
                 }
-            }
+            },
+            enableDragDetector = !(gotPieceFlying && draggingItem != null && draggingItem.pieceIndex + 1 == track.pieces.size)
         ) {
             requestAdding.invoke { result: List<SelectInfo> ->
                 onTrackChange(Track(track.pieces + result.map {
@@ -145,9 +146,12 @@ fun Track(
 fun AddPieceButton(
     draggingItem: DraggingItem?,
     onDraggingInScopeChange: (Boolean) -> Unit,
-    onClick: () -> Unit
+    enableDragDetector: Boolean = true,
+
+    onClick: () -> Unit,
 ) {
     DraggingItemDetector(
+        enabled = enableDragDetector,
         draggingItem = draggingItem,
         onDraggingInScopeChange = onDraggingInScopeChange) {
         IconButton(
