@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
@@ -48,7 +47,9 @@ fun Track(
     onDraggingInScope: (Int) -> Unit,
     onInScopePiecesClear: () -> Unit,
 
-    shouldAnimateDraggingItemBack: () -> Boolean
+    shouldAnimateDraggingItemBack: () -> Boolean,
+
+    maxTrackLengthDp: Int
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -59,9 +60,7 @@ fun Track(
             .fillMaxWidth()
             .padding(vertical = 10.dp)
     ) {
-        val maxTrackLength = LocalConfiguration.current.screenWidthDp
-
-        Spacer(modifier = Modifier.width((maxTrackLength / 2).dp))
+        Spacer(modifier = Modifier.width((maxTrackLengthDp / 2).dp))
 
         val compensationMap = remember { mutableStateListOf<Pair<Int, Float>>() }
         val inScopePieceSet = remember { HashSet<Int>() }
@@ -71,7 +70,7 @@ fun Track(
         track.pieces.forEachIndexed { index, piece ->
 
             val selected = selectedSet.contains(piece)
-            val pieceWidth = (maxTrackLength * (piece.duration / totalDuration.toFloat())).roundToInt().dp
+            val pieceWidth = (maxTrackLengthDp * (piece.duration / totalDuration.toFloat())).roundToInt().dp
             Piece(
                 zoom = zoom,
                 piece = piece,
@@ -139,7 +138,7 @@ fun Track(
                         model = it.path, end = (it.duration?:2000) - 1) } ))
             }
         }
-        Spacer(modifier = Modifier.width((maxTrackLength / 2 - 48).dp))
+        Spacer(modifier = Modifier.width((maxTrackLengthDp / 2 - 48).dp))
     }
 }
 @Composable

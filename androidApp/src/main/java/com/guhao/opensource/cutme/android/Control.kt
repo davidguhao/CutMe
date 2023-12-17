@@ -1,6 +1,5 @@
 package com.guhao.opensource.cutme.android
 
-import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -9,7 +8,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -23,11 +21,9 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -60,10 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import com.guhao.opensource.cutme.millisTimeFormat
 import com.guhao.opensource.cutme.millisTimeStandardFormat
 import kotlin.math.PI
@@ -71,7 +63,11 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
-fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>): List<Track> {
+fun List<Track>.move(
+    initialPos: Pair<Int, Int>,
+    targetPosition: Pair<Int, Int>,
+    precedingBlankPieceDuration: Long? = null): List<Track> {
+
     return ArrayList(this).apply {
         val piece = this[initialPos.first].pieces[initialPos.second]
 
@@ -81,12 +77,16 @@ fun List<Track>.move(initialPos: Pair<Int, Int>, targetPosition: Pair<Int, Int>)
             newPieces.removeAt(initialPos.second)
 
             this[initialPos.first] = Track(pieces = newPieces)
+
         }
         fun addNew() {
             val targetTrackIndex = targetPosition.first
             val targetPieceIndex = targetPosition.second
             if(targetTrackIndex < 0 || targetTrackIndex >= size) {
-                add(Track(pieces = listOf(piece)))
+                val pieces = if(precedingBlankPieceDuration != null && precedingBlankPieceDuration > 0) {
+                    listOf(Piece(model = null, end = precedingBlankPieceDuration), piece)
+                } else listOf(piece)
+                add(Track(pieces = pieces))
             } else {
                 val newPieces = ArrayList(this[targetTrackIndex].pieces)
 
@@ -215,13 +215,7 @@ class ControlState {
 fun rememberControlState(): ControlState {
     return remember { ControlState() }
 }
-fun List<Track>.longestDuration(): Long {
-    var res = 0L
-    forEach { t ->
-        res = res.coerceAtLeast(t.pieces.sumOf { it.duration })
-    }
-    return res
-}
+fun List<Track>.longestDuration(): Long = maxOf { track -> track.pieces.sumOf { it.duration }}
 
 @Composable
 fun ZoomBox(
@@ -262,6 +256,7 @@ fun Control(
 
     var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var currentPrecedingPaddingDp by remember { mutableIntStateOf(0) }
 
     var zoom by remember { mutableFloatStateOf(1f) }
 
@@ -278,6 +273,9 @@ fun Control(
     ) {
         val horizontalScrollState = controlState.progressState
         val totalDuration = tracks.longestDuration()
+        val screenWidthDp = LocalConfiguration.current.screenWidthDp
+        val maxTrackLengthDp = screenWidthDp
+        val startAndEndPaddingDp = maxTrackLengthDp / 2
 
         val inScopeTrackSet = remember { HashSet<Int>() }
 
@@ -320,7 +318,14 @@ fun Control(
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
 
-                                onTracksChange.invoke(currentTracks.move(initialPos, targetPos))
+                                onTracksChange.invoke(
+                                    currentTracks.move(
+                                        initialPos,
+                                        targetPos,
+                                        precedingBlankPieceDuration = if(currentPrecedingPaddingDp > 0) {
+                                            (totalDuration * currentPrecedingPaddingDp / maxTrackLengthDp.toFloat()).roundToLong()
+                                        } else null
+                                    ))
                             }
                         }
 
@@ -336,70 +341,60 @@ fun Control(
                             currentDroppingTarget = null
                         }
                     },
-                    shouldAnimateDraggingItemBack = { currentDroppingTarget == null }
+                    shouldAnimateDraggingItemBack = { currentDroppingTarget == null },
+
+                    maxTrackLengthDp = maxTrackLengthDp
+
                 )
             }
 
             item {
                 val density = LocalDensity.current.density
-                val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
                 var inScope by remember { mutableStateOf(false) }
-                var offset by remember { mutableIntStateOf(0) }
-                LaunchedEffect(key1 = inScope) {
-                    if(inScope) ValueAnimator.ofInt(0, (screenWidth.value * density).roundToInt()).apply {
-                        duration = 250
-                        addUpdateListener {
-                            offset = it.animatedValue as Int
-                        }
-                    }.start()
-                }
 
-                DraggingItemDetector2(
-                    modifier = Modifier
-                        .padding(start = (horizontalScrollState.value / density).dp)
-                        .width(screenWidth)
-                        .height(pieceHeight),
-                    draggingItem = draggingItem,
-                    onDraggingInScopeChange = {
-                        inScope = it
+                fun calTarget(draggingItem: DraggingItem) = ((horizontalScrollState.value + draggingItem.position.x) / density - draggingItem.width.value / 2 - startAndEndPaddingDp).roundToInt().coerceAtLeast(0)
 
-                        val trackIndex = tracks.size
-
-                        if(it) {
-                            currentDroppingTarget = Pair(trackIndex, 0)
-                            inScopeTrackSet.add(trackIndex)
-                        } else {
-                            inScopeTrackSet.remove(trackIndex)
-                            if(inScopeTrackSet.isEmpty()) {
-                                currentDroppingTarget = null
-                            }
-                        }
-                    }
-                ) {
+                val blankPieceWidthDp = draggingItem?.let { calTarget(it) } ?: 0
+                currentPrecedingPaddingDp = blankPieceWidthDp
+                Box {
                     AnimatedVisibility(
-                        enter = fadeIn(), exit = fadeOut(),
-                        visible = inScope
+                        visible = inScope && blankPieceWidthDp > 0,
+                        enter = fadeIn(), exit = fadeOut()
                     ) {
-                        Row(
-                            modifier = Modifier.offset { IntOffset(x = (screenWidth.value * density - offset).roundToInt(), y = 0) }
-                        ) {
-                            (0 until 4).forEach { _ ->
-                                PieceCard(
-                                    modifier = Modifier
-                                        .alpha(0.2f)
-                                        .width((screenWidth.value / 4).dp)
-                                        .height(pieceHeight)
-                                        .background(color = Color.White)
-                                ) {
+                        PieceCard(
+                            modifier = Modifier
+                                .alpha(0.5f)
+                                .padding(start = startAndEndPaddingDp.dp)
+                                .width(blankPieceWidthDp.dp * zoom)
+                                .height(pieceHeight),
+                        ) {}
+                    }
+
+                    DraggingItemDetector2(
+                        modifier = Modifier
+                            .padding(start = (horizontalScrollState.value / density).dp)
+                            .width(screenWidthDp.dp)
+                            .height(pieceHeight),
+                        draggingItem = draggingItem,
+                        onDraggingInScopeChange = {
+                            inScope = it
+
+                            val trackIndex = tracks.size
+
+                            if(it) {
+                                currentDroppingTarget = Pair(trackIndex, 0)
+                                inScopeTrackSet.add(trackIndex)
+                            } else {
+                                inScopeTrackSet.remove(trackIndex)
+                                if(inScopeTrackSet.isEmpty()) {
+                                    currentDroppingTarget = null
                                 }
                             }
                         }
-
-
-                    }
-
+                    ) {}
                 }
+
 
             }
         }
