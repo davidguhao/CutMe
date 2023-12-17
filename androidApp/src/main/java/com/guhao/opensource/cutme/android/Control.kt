@@ -249,6 +249,7 @@ fun Control(
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
     controlState: ControlState = rememberControlState(),
 ) {
+
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
     BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
         selectedPiecesSet = setOf()
@@ -259,6 +260,7 @@ fun Control(
     var currentPrecedingPaddingDp by remember { mutableIntStateOf(0) }
 
     var zoom by remember { mutableFloatStateOf(1f) }
+
 
     val currentTracks by remember { mutableStateOf<List<Track>>(listOf()) }.also {
         it.value = tracks
@@ -273,8 +275,16 @@ fun Control(
     ) {
         val horizontalScrollState = controlState.progressState
         val totalDuration = tracks.longestDuration()
+
         val screenWidthDp = LocalConfiguration.current.screenWidthDp
         val maxTrackLengthDp = screenWidthDp
+
+        val onTracksChangeInControl = { newTracks: List<Track> ->
+            if(totalDuration > 0) zoom *= (newTracks.longestDuration() / totalDuration.toFloat())
+
+            onTracksChange.invoke(newTracks)
+        }
+
         val startAndEndPaddingDp = maxTrackLengthDp / 2
 
         val inScopeTrackSet = remember { HashSet<Int>() }
@@ -290,7 +300,7 @@ fun Control(
                 Track(
                     track = track,
                     onTrackChange = { it: Track ->
-                        onTracksChange.invoke(ArrayList(tracks).apply {
+                        onTracksChangeInControl.invoke(ArrayList(tracks).apply {
                             this[indexOf(track)] = it
                         })
                     },
@@ -318,7 +328,7 @@ fun Control(
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
 
-                                onTracksChange.invoke(
+                                onTracksChangeInControl.invoke(
                                     currentTracks.move(
                                         initialPos,
                                         targetPos,
@@ -421,7 +431,7 @@ fun Control(
                 selectedPiecesSet = it
             },
             tracks = tracks,
-            onTracksChange = onTracksChange,
+            onTracksChange = onTracksChangeInControl,
             currentGlobalProgressInMillis = currentGlobalProgressInMillis,
             requestAdding = requestAdding
         )
