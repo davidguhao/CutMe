@@ -246,36 +246,34 @@ fun Piece(
 
     val actualWidth = width * zoom
 
-    var alpha by remember { mutableFloatStateOf(1f) }
     val returnToOldPlace = {
-        alpha = if(shouldAnimateDraggingItemBack.invoke()) 1f else 0f
-
-        ValueAnimator
-            .ofFloat(draggingOffset.x, 0f)
-            .apply {
-                duration = 250
-                addUpdateListener {
-                    draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
-                    if(abs(draggingOffset.x) < 1f && abs(draggingOffset.y) < 1f) alpha = 1f
+        if(shouldAnimateDraggingItemBack.invoke()) {
+            ValueAnimator
+                .ofFloat(draggingOffset.x, 0f)
+                .apply {
+                    duration = 250
+                    addUpdateListener {
+                        draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
+                    }
                 }
-            }
-            .start()
-        ValueAnimator
-            .ofFloat(draggingOffset.y, 0f)
-            .apply {
-                duration = 250
-                addUpdateListener {
-                    draggingOffset = draggingOffset.copy(y = it.animatedValue as Float)
-                    if(abs(draggingOffset.x) < 1f && abs(draggingOffset.y) < 1f) alpha = 1f
+                .start()
+            ValueAnimator
+                .ofFloat(draggingOffset.y, 0f)
+                .apply {
+                    duration = 250
+                    addUpdateListener {
+                        draggingOffset = draggingOffset.copy(y = it.animatedValue as Float)
+                    }
                 }
-            }
-            .start()
+                .start()
+        } else {
+            draggingOffset = Offset.Zero
+        }
     }
 
     DraggingItemDetector(
         modifier = Modifier
-            .zIndex(if (flying) 1f else 0f)
-            .alpha(alpha),
+            .zIndex(if (flying) 1f else 0f),
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,
