@@ -311,7 +311,7 @@ fun Piece(
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.UPDATE,
                             DraggingItem(
-                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x - currentCompensation) },
+                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x + currentCompensation) },
                                 width = currentRect.width.toDp(),
                             )
                         )
@@ -335,7 +335,7 @@ fun Piece(
             }
             .offset {
                 IntOffset(
-                    x = (draggingOffset.x - if (flying) compensationTranslationX else 0f).roundToInt(),
+                    x = (draggingOffset.x + if (flying) compensationTranslationX else 0f).roundToInt(),
                     y = draggingOffset.y.roundToInt()
                 )
             } // Pixel

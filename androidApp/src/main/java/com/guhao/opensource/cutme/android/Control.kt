@@ -278,6 +278,9 @@ fun Control(
         onZoomChange = { zoom = it }
     ) {
         val horizontalScrollState = controlState.progressState
+        var xPosOnCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
+        val compensationCausedByScroll = horizontalScrollState.value - xPosOnCreated
+
         val totalDuration = tracks.longestDuration()
 
         val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -343,6 +346,12 @@ fun Control(
                             }
                         }
 
+                        if(reason == DraggingItemChangeReason.UPDATE && draggingItem == null && item != null) {
+                            // Means created for the first time.
+
+                            xPosOnCreated = horizontalScrollState.value
+                        }
+
                         draggingItem = item?.copy(trackIndex = trackIndex)
                     },
                     onDraggingInScope = { pieceIndex ->
@@ -358,7 +367,6 @@ fun Control(
                     shouldAnimateDraggingItemBack = { currentDroppingTarget == null },
 
                     maxTrackLengthDp = maxTrackLengthDp,
-
                 )
             }
 

@@ -141,7 +141,7 @@ fun DraggingItemDetector(
             duration = 250
             addUpdateListener { animator ->
                 translationXForDragDp = animator.animatedValue as Float
-                onOffsetChange.invoke(translationXForDragDp * density)
+                onOffsetChange.invoke(-translationXForDragDp * density)
             }
         }.start()
     }
