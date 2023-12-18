@@ -85,18 +85,25 @@ fun DraggingItemDetector2(
     onDraggingInScopeChange: (Boolean) -> Unit,
 
     enabled: Boolean = true,
+    isInScopeX: (
+        randomPoint: Offset,
+        center: Offset,
+        width: Float,
+        height: Float,
+
+        offset: Float) -> Boolean = ::isInScope,
 
     block: @Composable () -> Unit
 ) {
     var currentRect by remember { mutableStateOf(Rect.Zero) }
-    val draggingInScope = draggingItem?.let { enabled && isInScope(
-        randomPoint = it.position,
+    val draggingInScope = draggingItem?.let { enabled && isInScopeX(
+        it.position,
 
-        center = currentRect.center,
-        width = currentRect.width,
-        height = currentRect.height,
+        currentRect.center,
+        currentRect.width,
+        currentRect.height,
 
-        offset = 0f
+        0f
     ) }?: false
     LaunchedEffect(key1 = draggingInScope) {
         onDraggingInScopeChange(draggingInScope)

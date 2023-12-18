@@ -477,7 +477,6 @@ fun EdgeDraggingDetector(
     Box(modifier = modifier) {
         var inScope by remember { mutableIntStateOf(0) }
 
-
         val totalBrowseTime = 5 * 1000 // This is the time that you will need to browse the complete longest track.
         var currentAnimator by remember { mutableStateOf<ValueAnimator?>(null) }
         LaunchedEffect(key1 = inScope) {
@@ -509,19 +508,48 @@ fun EdgeDraggingDetector(
             }
         }
 
-        val edge = @Composable { modifier: Modifier, onDraggingInScopeChange: (Boolean) -> Unit ->
+        val edge = @Composable { modifier: Modifier,
+                                 isInScopeX: (
+                                     randomPoint: Offset,
+                                     center: Offset,
+                                     width: Float,
+                                     height: Float,
+                                     offset: Float) -> Boolean,
+                                 onDraggingInScopeChange: (Boolean) -> Unit ->
+
             val screenWidthDp = LocalConfiguration.current.screenWidthDp
             DraggingItemDetector2(
                 modifier = modifier
                     .fillMaxHeight()
                     .width(screenWidthDp.dp / 10),
-                draggingItem = draggingItem, onDraggingInScopeChange = onDraggingInScopeChange, block = {})
+                draggingItem = draggingItem,
+                onDraggingInScopeChange = onDraggingInScopeChange,
+                isInScopeX = isInScopeX,
+                block = {}
+            )
         }
 
-        edge.invoke(Modifier.align(Alignment.CenterStart)) {
+        edge.invoke(
+            Modifier.align(Alignment.CenterStart),
+            { randomPoint: Offset,
+              center: Offset,
+              width: Float,
+              _: Float,
+              _: Float ->
+                randomPoint.x < center.x + width / 2
+            }) {
             inScope = if(it) -1 else 0
         }
-        edge.invoke(Modifier.align(Alignment.CenterEnd)) {
+        edge.invoke(
+            Modifier.align(Alignment.CenterEnd),
+            { randomPoint: Offset,
+              center: Offset,
+              width: Float,
+              _: Float,
+              _: Float ->
+                randomPoint.x > center.x - width / 2
+            }
+            ) {
             inScope = if(it) 1 else 0
         }
 
