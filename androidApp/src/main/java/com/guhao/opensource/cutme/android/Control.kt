@@ -434,7 +434,8 @@ fun Control(
             onExpectingScrollingToChange = {
                 expectingScrollingTo = it
             },
-            maxScrollValue = horizontalScrollState.maxValue
+            maxScrollValue = horizontalScrollState.maxValue,
+            zoom = zoom
         )
 
         val currentGlobalProgressInMillis = controlState.calCurrentMillis(totalDuration) // in milliseconds
@@ -473,16 +474,18 @@ fun EdgeDraggingDetector(
     onExpectingScrollingToChange: (Int) -> Unit,
 
     maxScrollValue: Int,
+    zoom: Float
 ) {
     Box(modifier = modifier) {
         var inScope by remember { mutableIntStateOf(0) }
 
-        val totalBrowseTime = 5 * 1000 // This is the time that you will need to browse the complete longest track.
+        val totalBrowseTime = 2 * 1000 * zoom // This is the time that you will need to browse the complete longest track.
         var currentAnimator by remember { mutableStateOf<ValueAnimator?>(null) }
         LaunchedEffect(key1 = inScope) {
 
             val backScrollTime = (totalBrowseTime * currentScrollValue / maxScrollValue.toFloat()).roundToLong()
-            val forwardScrollTime = totalBrowseTime - backScrollTime
+            val forwardScrollTime = (totalBrowseTime - backScrollTime).roundToLong()
+
             when(inScope) {
                 -1 -> { // Start detected
                     ValueAnimator.ofInt(currentScrollValue, 0).apply {
