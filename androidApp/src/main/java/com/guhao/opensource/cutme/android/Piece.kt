@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -235,8 +236,10 @@ fun Piece(
     draggingItem: DraggingItem?,
     onDraggingItemChange: (DraggingItemChangeReason, DraggingItem?) -> Unit,
 
-    compensationX: Float,
-    onCompensationXChange: (Float) -> Unit,
+    scrollingCompensationX: Int,
+
+    piecesPaddingCompensationX: Float,
+    onPiecesPaddingCompensationXChange: (Float) -> Unit,
 
     draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) },
     onDraggingInScopeChange: (Boolean) -> Unit,
@@ -248,6 +251,10 @@ fun Piece(
     val flying = draggingOffset != Offset.Zero
 
     val actualWidth = width * zoom
+    var scrollingCompensationXRemoveProcess by remember { mutableFloatStateOf(0f) }
+    val currentTotalCompensation by remember { mutableFloatStateOf(piecesPaddingCompensationX + scrollingCompensationX) }.also {
+        it.floatValue = piecesPaddingCompensationX + scrollingCompensationX
+    }
 
     val returnToOldPlace = {
         if(shouldAnimateDraggingItemBack.invoke()) {
@@ -260,17 +267,19 @@ fun Piece(
                     }
                 }
                 .start()
-            ValueAnimator
-                .ofFloat(draggingOffset.y, 0f)
-                .apply {
-                    duration = 250
-                    addUpdateListener {
-                        draggingOffset = draggingOffset.copy(y = it.animatedValue as Float)
-                    }
-                }
-                .start()
+
+            ValueAnimator.ofFloat(scrollingCompensationXRemoveProcess, currentTotalCompensation).apply {
+                duration = 250
+                addUpdateListener { scrollingCompensationXRemoveProcess = it.animatedValue as Float }
+            }.start()
+
+            ValueAnimator.ofFloat(draggingOffset.y, 0f).apply {
+                duration = 250
+                addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
+            }.start()
+
         } else {
-            draggingOffset = Offset.Zero
+            draggingOffset = Offset.Zero // Flash back
         }
     }
 
@@ -280,16 +289,16 @@ fun Piece(
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,
-        onOffsetChange = onCompensationXChange,
+        onOffsetChange = onPiecesPaddingCompensationXChange,
         onDraggingInScopeChange = onDraggingInScopeChange
     ) { shouldPadding ->
 
         var currentRect by remember { mutableStateOf(Rect.Zero) }
         var currentCompensation by remember { mutableFloatStateOf(0f) }
-        currentCompensation = compensationX + (if(flying) draggingItem?.compensationX ?: 0 else 0)
+        currentCompensation = piecesPaddingCompensationX + scrollingCompensationX - scrollingCompensationXRemoveProcess
+
         var scale by remember { mutableFloatStateOf(1f) }
-        var scaleState by remember { mutableStateOf(ScaleState.ORIGINAL) }
-        scaleState = if(selected) ScaleState.SELECTED
+        val scaleState = if(selected) ScaleState.SELECTED
         else if(flying) ScaleState.FLYING
         else ScaleState.ORIGINAL
         LaunchedEffect(key1 = scaleState) {
@@ -325,6 +334,7 @@ fun Piece(
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(
                     onDragStart = {
+                        scrollingCompensationXRemoveProcess = 0f
                     },
                     onDrag = { _: PointerInputChange, dragAmount: Offset ->
                         draggingOffset += dragAmount
@@ -356,8 +366,7 @@ fun Piece(
             }
             .offset {
                 IntOffset(
-                    x = (draggingOffset.x + compensationX + if (flying) (draggingItem?.compensationX
-                        ?: 0) else 0).roundToInt(),
+                    x = (draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(flying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
                     y = draggingOffset.y.roundToInt()
                 )
             } // Pixel

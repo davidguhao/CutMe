@@ -279,7 +279,8 @@ fun Control(
     ) {
         val horizontalScrollState = controlState.progressState
         var xPosOnCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
-        val expectedCompensationCausedByScroll = horizontalScrollState.value - xPosOnCreated
+        val scrollingCompensationX = horizontalScrollState.value - xPosOnCreated
+
 
         val totalDuration = tracks.longestDuration()
 
@@ -327,7 +328,7 @@ fun Control(
 //                        }.start()
 //                    },
                     totalDuration = totalDuration,
-                    draggingItem = draggingItem?.copy(compensationX = expectedCompensationCausedByScroll),
+                    draggingItem = draggingItem,
                     onDraggingItemChange = { reason, item ->
 
                         if(reason != DraggingItemChangeReason.UPDATE) {
@@ -367,6 +368,7 @@ fun Control(
                     shouldAnimateDraggingItemBack = { currentDroppingTarget == null },
 
                     maxTrackLengthDp = maxTrackLengthDp,
+                    scrollingCompensationX = scrollingCompensationX,
                 )
             }
 

@@ -50,6 +50,7 @@ fun Track(
     shouldAnimateDraggingItemBack: () -> Boolean,
 
     maxTrackLengthDp: Int,
+    scrollingCompensationX: Int,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -98,8 +99,9 @@ fun Track(
                         null
                     } else index
                 },
-                compensationX = if(flying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
-                onCompensationXChange = { x ->
+                scrollingCompensationX = if(flying) scrollingCompensationX else 0,
+                piecesPaddingCompensationX = if(flying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
+                onPiecesPaddingCompensationXChange = { x ->
                     compensationMap.apply {
                         val ready = Pair(index, x)
 
