@@ -25,6 +25,8 @@ data class DraggingItem(
 
     val pieceIndex: Int = -1,
     val trackIndex: Int = -1,
+
+    val compensationX: Int = 0
 )
 
 fun isInScope(

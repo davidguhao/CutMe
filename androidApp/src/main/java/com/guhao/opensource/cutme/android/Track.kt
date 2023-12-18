@@ -72,6 +72,9 @@ fun Track(
             val selected = selectedSet.contains(piece)
             val pieceWidth = (maxTrackLengthDp * (piece.duration / totalDuration.toFloat())).roundToInt().dp
 
+            val draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap[index] = it }
+            val flying = draggingOffsetState.value != Offset.Zero
+
             Piece(
                 zoom = zoom,
                 piece = piece,
@@ -95,8 +98,8 @@ fun Track(
                         null
                     } else index
                 },
-                compensationTranslationX = compensationMap.filter { it.first < index }.map { it.second }.sum(),
-                onCompensationTranslationXChange = { x ->
+                compensationX = if(flying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
+                onCompensationXChange = { x ->
                     compensationMap.apply {
                         val ready = Pair(index, x)
 
@@ -106,7 +109,7 @@ fun Track(
                             add(ready)
                     }
                 },
-                draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap[index] = it },
+                draggingOffsetState = draggingOffsetState,
                 onDraggingInScopeChange = {
                     if(it) {
                         onDraggingInScope.invoke(index)

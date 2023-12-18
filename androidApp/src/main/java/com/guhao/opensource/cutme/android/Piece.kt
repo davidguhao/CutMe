@@ -47,7 +47,6 @@ import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -232,8 +231,8 @@ fun Piece(
     draggingItem: DraggingItem?,
     onDraggingItemChange: (DraggingItemChangeReason, DraggingItem?) -> Unit,
 
-    compensationTranslationX: Float,
-    onCompensationTranslationXChange: (Float) -> Unit,
+    compensationX: Float,
+    onCompensationXChange: (Float) -> Unit,
 
     draggingOffsetState: MutableState<Offset> = remember { mutableStateOf(Offset.Zero) },
     onDraggingInScopeChange: (Boolean) -> Unit,
@@ -277,13 +276,13 @@ fun Piece(
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,
-        onOffsetChange = onCompensationTranslationXChange,
+        onOffsetChange = onCompensationXChange,
         onDraggingInScopeChange = onDraggingInScopeChange
     ) { shouldPadding ->
 
         var currentRect by remember { mutableStateOf(Rect.Zero) }
         var currentCompensation by remember { mutableFloatStateOf(0f) }
-        currentCompensation = compensationTranslationX
+        currentCompensation = compensationX + (if(flying) draggingItem?.compensationX ?: 0 else 0)
         var scale by remember { mutableFloatStateOf(1f) }
         LaunchedEffect(key1 = selected) {
             if(selected) {
@@ -335,7 +334,7 @@ fun Piece(
             }
             .offset {
                 IntOffset(
-                    x = (draggingOffset.x + if (flying) compensationTranslationX else 0f).roundToInt(),
+                    x = (draggingOffset.x + compensationX + if(flying) (draggingItem?.compensationX ?: 0) else 0).roundToInt(),
                     y = draggingOffset.y.roundToInt()
                 )
             } // Pixel

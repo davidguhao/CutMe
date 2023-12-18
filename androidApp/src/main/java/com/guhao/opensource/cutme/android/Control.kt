@@ -279,7 +279,7 @@ fun Control(
     ) {
         val horizontalScrollState = controlState.progressState
         var xPosOnCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
-        val compensationCausedByScroll = horizontalScrollState.value - xPosOnCreated
+        val expectedCompensationCausedByScroll = horizontalScrollState.value - xPosOnCreated
 
         val totalDuration = tracks.longestDuration()
 
@@ -327,7 +327,7 @@ fun Control(
 //                        }.start()
 //                    },
                     totalDuration = totalDuration,
-                    draggingItem = draggingItem,
+                    draggingItem = draggingItem?.copy(compensationX = expectedCompensationCausedByScroll),
                     onDraggingItemChange = { reason, item ->
 
                         if(reason != DraggingItemChangeReason.UPDATE) {
@@ -512,7 +512,7 @@ fun EdgeDraggingDetector(
         val edge = @Composable { modifier: Modifier, onDraggingInScopeChange: (Boolean) -> Unit ->
             val screenWidthDp = LocalConfiguration.current.screenWidthDp
             DraggingItemDetector2(
-                modifier = modifier.background(color = Color.White)
+                modifier = modifier
                     .fillMaxHeight()
                     .width(screenWidthDp.dp / 10),
                 draggingItem = draggingItem, onDraggingInScopeChange = onDraggingInScopeChange, block = {})
