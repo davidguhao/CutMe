@@ -2,7 +2,6 @@ package com.guhao.opensource.cutme.android
 
 import android.animation.ValueAnimator
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +46,36 @@ fun isInScope(
     return xInScope && yInScope
 }
 @Composable
+fun DraggingItemHighFrequencyDetector(
+    modifier: Modifier = Modifier,
+
+    draggingItem: DraggingItem?,
+    onDraggingInScopeChange: (Boolean) -> Unit,
+
+    enabled: Boolean = true,
+
+    block: @Composable () -> Unit
+) {
+    var currentRect by remember { mutableStateOf(Rect.Zero) }
+    val draggingInScope = draggingItem?.let { enabled && isInScope(
+        randomPoint = it.position,
+
+        center = currentRect.center,
+        width = currentRect.width,
+        height = currentRect.height,
+
+        offset = 0f
+    ) }?: false
+
+    onDraggingInScopeChange(draggingInScope)
+
+    Box(modifier = modifier.onGloballyPositioned { layoutCoordinates ->
+        currentRect = layoutCoordinates.boundsInWindow()
+    }) {
+        block.invoke()
+    }
+}
+@Composable
 fun DraggingItemDetector2(
     modifier: Modifier = Modifier,
 
@@ -76,7 +105,6 @@ fun DraggingItemDetector2(
     }) {
         block.invoke()
     }
-
 }
 @Composable
 fun DraggingItemDetector(

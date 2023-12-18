@@ -1,5 +1,6 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -8,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -353,7 +357,7 @@ fun Control(
                     },
                     shouldAnimateDraggingItemBack = { currentDroppingTarget == null },
 
-                    maxTrackLengthDp = maxTrackLengthDp
+                    maxTrackLengthDp = maxTrackLengthDp,
 
                 )
             }
@@ -409,6 +413,21 @@ fun Control(
             }
         }
 
+        var expectingScrollingTo by remember { mutableIntStateOf(0) }
+        LaunchedEffect(key1 = expectingScrollingTo) {
+            horizontalScrollState.scrollTo(expectingScrollingTo)
+        }
+
+        EdgeDraggingDetector(
+            modifier = Modifier.fillMaxSize(),
+            draggingItem = draggingItem,
+
+            currentScrollValue = horizontalScrollState.value,
+            onExpectingScrollingToChange = {
+                expectingScrollingTo = it
+            },
+            maxScrollValue = horizontalScrollState.maxValue
+        )
 
         val currentGlobalProgressInMillis = controlState.calCurrentMillis(totalDuration) // in milliseconds
 
@@ -435,6 +454,69 @@ fun Control(
             currentGlobalProgressInMillis = currentGlobalProgressInMillis,
             requestAdding = requestAdding
         )
+    }
+}
+
+@Composable
+fun EdgeDraggingDetector(
+    modifier: Modifier,
+    draggingItem: DraggingItem?,
+    currentScrollValue: Int,
+    onExpectingScrollingToChange: (Int) -> Unit,
+
+    maxScrollValue: Int,
+) {
+    Box(modifier = modifier) {
+        var inScope by remember { mutableIntStateOf(0) }
+
+
+        val totalBrowseTime = 5 * 1000 // This is the time that you will need to browse the complete longest track.
+        var currentAnimator by remember { mutableStateOf<ValueAnimator?>(null) }
+        LaunchedEffect(key1 = inScope) {
+
+            val backScrollTime = (totalBrowseTime * currentScrollValue / maxScrollValue.toFloat()).roundToLong()
+            val forwardScrollTime = totalBrowseTime - backScrollTime
+            when(inScope) {
+                -1 -> { // Start detected
+                    ValueAnimator.ofInt(currentScrollValue, 0).apply {
+                        duration = backScrollTime
+                        addUpdateListener {
+                            onExpectingScrollingToChange.invoke(it.animatedValue as Int)
+                        }
+                    }.also { currentAnimator = it }.start()
+                }
+
+                0 -> { // Cancelled
+                    currentAnimator?.cancel()
+                }
+
+                1 -> { // End detected
+                    ValueAnimator.ofInt(currentScrollValue, maxScrollValue).apply {
+                        duration = forwardScrollTime
+                        addUpdateListener { onExpectingScrollingToChange.invoke(it.animatedValue as Int) }
+                    }.also { currentAnimator = it }.start()
+                }
+
+                else -> throw UnsupportedOperationException()
+            }
+        }
+
+        val edge = @Composable { modifier: Modifier, onDraggingInScopeChange: (Boolean) -> Unit ->
+            val screenWidthDp = LocalConfiguration.current.screenWidthDp
+            DraggingItemDetector2(
+                modifier = modifier.background(color = Color.White)
+                    .fillMaxHeight()
+                    .width(screenWidthDp.dp / 10),
+                draggingItem = draggingItem, onDraggingInScopeChange = onDraggingInScopeChange, block = {})
+        }
+
+        edge.invoke(Modifier.align(Alignment.CenterStart)) {
+            inScope = if(it) -1 else 0
+        }
+        edge.invoke(Modifier.align(Alignment.CenterEnd)) {
+            inScope = if(it) 1 else 0
+        }
+
     }
 }
 

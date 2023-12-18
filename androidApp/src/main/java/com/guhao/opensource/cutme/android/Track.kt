@@ -49,7 +49,7 @@ fun Track(
 
     shouldAnimateDraggingItemBack: () -> Boolean,
 
-    maxTrackLengthDp: Int
+    maxTrackLengthDp: Int,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -71,6 +71,7 @@ fun Track(
 
             val selected = selectedSet.contains(piece)
             val pieceWidth = (maxTrackLengthDp * (piece.duration / totalDuration.toFloat())).roundToInt().dp
+
             Piece(
                 zoom = zoom,
                 piece = piece,
