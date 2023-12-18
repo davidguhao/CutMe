@@ -217,6 +217,10 @@ suspend fun PointerInputScope.dragGesturesAfterLongPress(
 
 val pieceHeight = 70.dp
 
+enum class ScaleState {
+    ORIGINAL, SELECTED, FLYING
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -284,17 +288,35 @@ fun Piece(
         var currentCompensation by remember { mutableFloatStateOf(0f) }
         currentCompensation = compensationX + (if(flying) draggingItem?.compensationX ?: 0 else 0)
         var scale by remember { mutableFloatStateOf(1f) }
-        LaunchedEffect(key1 = selected) {
-            if(selected) {
-                ValueAnimator.ofFloat(scale, 0.9f).apply {
-                    duration = 100
-                    addUpdateListener { scale = it.animatedValue as Float }
+        var scaleState by remember { mutableStateOf(ScaleState.ORIGINAL) }
+        scaleState = if(selected) ScaleState.SELECTED
+        else if(flying) ScaleState.FLYING
+        else ScaleState.ORIGINAL
+        LaunchedEffect(key1 = scaleState) {
+            fun scaleTo(target: Float) {
+                val overScaleExtent = 0.1f
+                val overScaleTarget = if(scale < target) target + overScaleExtent else target - overScaleExtent
+
+                ValueAnimator.ofFloat(scale, overScaleTarget).apply {
+                    duration = 80
+                    addUpdateListener { animator ->
+                        scale = animator.animatedValue as Float
+
+                        // About end
+                        if(scale - overScaleTarget < 0.01f) {
+                            ValueAnimator.ofFloat(scale, target).apply {
+                                duration = 70
+                                addUpdateListener { scale = it.animatedValue as Float }
+                            }.start()
+                        }
+                    }
                 }.start()
-            } else {
-                ValueAnimator.ofFloat(scale, 1f).apply {
-                    duration = 100
-                    addUpdateListener { scale = it.animatedValue as Float }
-                }.start()
+            }
+
+            when(scaleState) {
+                ScaleState.ORIGINAL -> scaleTo(1f)
+                ScaleState.SELECTED -> scaleTo(0.85f)
+                ScaleState.FLYING -> scaleTo(1.15f)
             }
         }
         PieceCard(modifier = Modifier
@@ -334,7 +356,8 @@ fun Piece(
             }
             .offset {
                 IntOffset(
-                    x = (draggingOffset.x + compensationX + if(flying) (draggingItem?.compensationX ?: 0) else 0).roundToInt(),
+                    x = (draggingOffset.x + compensationX + if (flying) (draggingItem?.compensationX
+                        ?: 0) else 0).roundToInt(),
                     y = draggingOffset.y.roundToInt()
                 )
             } // Pixel

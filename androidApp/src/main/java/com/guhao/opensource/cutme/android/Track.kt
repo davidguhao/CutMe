@@ -146,6 +146,7 @@ fun Track(
         Spacer(modifier = Modifier.width((maxTrackLengthDp / 2 - 48).dp))
     }
 }
+
 @Composable
 fun AddPieceButton(
     draggingItem: DraggingItem?,
