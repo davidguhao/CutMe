@@ -340,7 +340,7 @@ fun Control(
                                         initialPos,
                                         targetPos,
                                         precedingBlankPieceDuration = if(currentPrecedingPaddingDp > 0) {
-                                            (totalDuration * currentPrecedingPaddingDp / maxTrackLengthDp.toFloat()).roundToLong()
+                                            (totalDuration * (currentPrecedingPaddingDp / zoom) / maxTrackLengthDp.toFloat()).roundToLong()
                                         } else null
                                     ))
                             }
