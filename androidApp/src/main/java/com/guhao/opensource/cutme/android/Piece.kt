@@ -244,7 +244,7 @@ fun Piece(
     onDraggingInScopeChange: (Boolean) -> Unit,
     enableDraggingDetector: Boolean,
 
-    shouldAnimateDraggingItemBack: () -> Boolean
+    hasDroppingTarget: () -> Boolean
 ) {
     var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
@@ -256,7 +256,9 @@ fun Piece(
     }
 
     val returnToOldPlace = {
-        if(shouldAnimateDraggingItemBack.invoke()) {
+        if(hasDroppingTarget.invoke()) {
+            draggingOffset = Offset.Zero // Flash back
+        } else {
             ValueAnimator
                 .ofFloat(draggingOffset.x, 0f)
                 .apply {
@@ -276,9 +278,6 @@ fun Piece(
                 duration = 250
                 addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
             }.start()
-
-        } else {
-            draggingOffset = Offset.Zero // Flash back
         }
     }
 
@@ -298,8 +297,14 @@ fun Piece(
 
         var scale by remember { mutableFloatStateOf(1f) }
         val scaleState = if(selected) ScaleState.SELECTED
-        else if(flying) ScaleState.FLYING
+        else if(flying) {
+            if(hasDroppingTarget.invoke()) {
+                ScaleState.ORIGINAL
+            } else
+                ScaleState.FLYING
+        }
         else ScaleState.ORIGINAL
+
         LaunchedEffect(key1 = scaleState) {
             fun scaleTo(target: Float) {
                 val overScaleExtent = 0.1f
@@ -328,7 +333,7 @@ fun Piece(
             }
         }
         PieceCard(modifier = Modifier
-            .onGloballyPositioned { currentRect = it.boundsInWindow() }
+            .onGloballyPositioned { currentRect = it.boundsInWindow() } // I need to know its position even if it is out of the window we are using.
             .padding(start = shouldPadding)
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(

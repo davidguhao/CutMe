@@ -367,7 +367,7 @@ fun Control(
                             currentDroppingTarget = null
                         }
                     },
-                    shouldAnimateDraggingItemBack = { currentDroppingTarget == null },
+                    hasDroppingTarget = { currentDroppingTarget != null },
 
                     maxTrackLengthDp = maxTrackLengthDp,
                     scrollingCompensationX = scrollingCompensationX,

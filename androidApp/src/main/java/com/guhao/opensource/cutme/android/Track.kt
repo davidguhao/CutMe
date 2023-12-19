@@ -58,7 +58,7 @@ fun Track(
     onDraggingInScope: (Int) -> Unit,
     onInScopePiecesClear: () -> Unit,
 
-    shouldAnimateDraggingItemBack: () -> Boolean,
+    hasDroppingTarget: () -> Boolean,
 
     maxTrackLengthDp: Int,
     scrollingCompensationX: Int,
@@ -134,7 +134,7 @@ fun Track(
                 },
                 enableDraggingDetector = currentDraggingIndex?.let { index != it + 1 } ?: true,
 
-                shouldAnimateDraggingItemBack = shouldAnimateDraggingItemBack
+                hasDroppingTarget = hasDroppingTarget
             )
         }
 
