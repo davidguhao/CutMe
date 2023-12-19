@@ -281,11 +281,8 @@ fun Control(
         val startAndEndPaddingDp = maxTrackLengthDp / 2
 
         val density = LocalDensity.current.density
-        fun calWidth(draggingItem: DraggingItem) =
-            ((horizontalScrollState.value + draggingItem.position.x) / density - draggingItem.width.value / 2 - startAndEndPaddingDp).roundToInt().coerceAtLeast(0)
 
-        val newTrackPrecedingPaddingDp = draggingItem?.let { calWidth(it) } ?: 0
-
+        var newTrackPrecedingPaddingDp by remember { mutableIntStateOf(0) }
 
         val totalDuration = tracks.longestDuration()
         val onTracksChangeInControl = { newTracks: List<Track> ->
@@ -375,29 +372,55 @@ fun Control(
             }
 
             item {
-                BlankPieceAndDetector(
-                    pieceModifier = Modifier
-                        .alpha(0.5f)
-                        .width(newTrackPrecedingPaddingDp.dp)
-                        .height(pieceHeight).padding(start = startAndEndPaddingDp.dp),
-                    detectorModifier = Modifier.padding(start = (horizontalScrollState.value / density).dp)
-                        .width(screenWidthDp.dp)
-                        .height(pieceHeight),
-                    draggingItem = draggingItem,
-                    onDraggingInScopeChange = {
-                        val trackIndex = tracks.size
 
-                        if(it) {
-                            currentDroppingTarget = Pair(trackIndex, 0)
-                            inScopeTrackSet.add(trackIndex)
-                        } else {
-                            inScopeTrackSet.remove(trackIndex)
-                            if(inScopeTrackSet.isEmpty()) {
-                                currentDroppingTarget = null
+                var inScope by remember { mutableStateOf(false) }
+                fun calWidth(draggingItem: DraggingItem): Int {
+                    val draggingItemLeft = draggingItem.position.x / density - draggingItem.width.value / 2
+
+                    return (horizontalScrollState.value / density + draggingItemLeft - startAndEndPaddingDp).roundToInt()
+                        .coerceAtLeast(0)
+                }
+                val blankPieceWidthDp = draggingItem?.let { calWidth(it) } ?: 0
+                newTrackPrecedingPaddingDp = blankPieceWidthDp
+                Box {
+                    AnimatedVisibility(
+                        visible = inScope,
+                        enter = fadeIn(), exit = fadeOut()
+                    ) {
+                        /**
+                         * If you put padding() after width(), your original rectangle will be cut by padding.
+                         */
+                        PieceCard(modifier = Modifier
+                            .alpha(0.5f)
+                            .padding(start = startAndEndPaddingDp.dp) // Warning: You have to put padding before width...
+                            .width(blankPieceWidthDp.dp)
+                            .height(pieceHeight)
+                        )
+                    }
+
+                    DraggingItemDetector(
+                        modifier = Modifier
+                            .padding(start = (horizontalScrollState.value / density).dp)
+                            .width(screenWidthDp.dp)
+                            .height(pieceHeight),
+                        draggingItem = draggingItem,
+                        onDraggingInScopeChange = {
+                            inScope = it
+
+                            val trackIndex = tracks.size
+
+                            if(it) {
+                                currentDroppingTarget = Pair(trackIndex, 0)
+                                inScopeTrackSet.add(trackIndex)
+                            } else {
+                                inScopeTrackSet.remove(trackIndex)
+                                if(inScopeTrackSet.isEmpty()) {
+                                    currentDroppingTarget = null
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
@@ -442,34 +465,6 @@ fun Control(
             onTracksChange = onTracksChangeInControl,
             currentGlobalProgressInMillis = currentGlobalProgressInMillis,
             requestAdding = requestAdding
-        )
-    }
-}
-
-@Composable
-fun BlankPieceAndDetector(
-    pieceModifier: Modifier,
-    detectorModifier: Modifier,
-    draggingItem: DraggingItem?,
-    onDraggingInScopeChange: (Boolean) -> Unit
-) {
-    var inScope by remember { mutableStateOf(false) }
-    Box {
-        AnimatedVisibility(
-            visible = inScope,
-            enter = fadeIn(), exit = fadeOut()
-        ) {
-            PieceCard(modifier = pieceModifier)
-        }
-
-        DraggingItemDetector(
-            modifier = detectorModifier,
-            draggingItem = draggingItem,
-            onDraggingInScopeChange = {
-                inScope = it
-
-                onDraggingInScopeChange.invoke(it)
-            }
         )
     }
 }
