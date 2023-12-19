@@ -9,7 +9,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -261,14 +260,11 @@ fun Control(
 
     var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var currentPrecedingPaddingDp by remember { mutableIntStateOf(0) }
-
-    var zoom by remember { mutableFloatStateOf(1f) }
-
 
     val currentTracks by remember { mutableStateOf<List<Track>>(listOf()) }.also {
         it.value = tracks
     }
+    var zoom by remember { mutableFloatStateOf(1f) }
     ZoomBox(
         modifier = modifier,
         onTouch = {
@@ -278,30 +274,36 @@ fun Control(
         onZoomChange = { zoom = it }
     ) {
         val horizontalScrollState = controlState.progressState
-        var xPosOnCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
-        val scrollingCompensationX = horizontalScrollState.value - xPosOnCreated
 
-
-        val totalDuration = tracks.longestDuration()
 
         val screenWidthDp = LocalConfiguration.current.screenWidthDp
         val maxTrackLengthDp = screenWidthDp
+        val startAndEndPaddingDp = maxTrackLengthDp / 2
 
+        val density = LocalDensity.current.density
+        fun calWidth(draggingItem: DraggingItem) =
+            ((horizontalScrollState.value + draggingItem.position.x) / density - draggingItem.width.value / 2 - startAndEndPaddingDp).roundToInt().coerceAtLeast(0)
+
+        val newTrackPrecedingPaddingDp = draggingItem?.let { calWidth(it) } ?: 0
+
+
+        val totalDuration = tracks.longestDuration()
         val onTracksChangeInControl = { newTracks: List<Track> ->
             if(totalDuration > 0) zoom *= (newTracks.longestDuration() / totalDuration.toFloat())
 
             onTracksChange.invoke(newTracks)
         }
 
-        val startAndEndPaddingDp = maxTrackLengthDp / 2
-
         val inScopeTrackSet = remember { HashSet<Int>() }
 
+        var xPosOnDragItemCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
         LazyColumn(
             modifier = Modifier
                 .padding(top = 50.dp)
                 .fillMaxSize()
                 .horizontalScroll(horizontalScrollState)) {
+            val scrollingCompensationX = horizontalScrollState.value - xPosOnDragItemCreated
+
             items(items = tracks) { track ->
                 val trackIndex = tracks.indexOf(track)
 
@@ -331,7 +333,7 @@ fun Control(
                     draggingItem = draggingItem,
                     onDraggingItemChange = { reason, item ->
 
-                        if(reason != DraggingItemChangeReason.UPDATE) {
+                        if(reason != DraggingItemChangeReason.UPDATE) { // Means end or cancel
                             // Currently the 'item' will be null, don't use it.
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
@@ -340,8 +342,8 @@ fun Control(
                                     currentTracks.move(
                                         initialPos,
                                         targetPos,
-                                        precedingBlankPieceDuration = if(currentPrecedingPaddingDp > 0) {
-                                            (totalDuration * (currentPrecedingPaddingDp / zoom) / maxTrackLengthDp.toFloat()).roundToLong()
+                                        precedingBlankPieceDuration = if(newTrackPrecedingPaddingDp > 0) {
+                                            (totalDuration * (newTrackPrecedingPaddingDp / zoom) / maxTrackLengthDp.toFloat()).roundToLong()
                                         } else null
                                     ))
                             }
@@ -350,7 +352,7 @@ fun Control(
                         if(reason == DraggingItemChangeReason.UPDATE && draggingItem == null && item != null) {
                             // Means created for the first time.
 
-                            xPosOnCreated = horizontalScrollState.value
+                            xPosOnDragItemCreated = horizontalScrollState.value
                         }
 
                         draggingItem = item?.copy(trackIndex = trackIndex)
@@ -373,53 +375,29 @@ fun Control(
             }
 
             item {
-                val density = LocalDensity.current.density
+                BlankPieceAndDetector(
+                    pieceModifier = Modifier
+                        .alpha(0.5f)
+                        .width(newTrackPrecedingPaddingDp.dp)
+                        .height(pieceHeight).padding(start = startAndEndPaddingDp.dp),
+                    detectorModifier = Modifier.padding(start = (horizontalScrollState.value / density).dp)
+                        .width(screenWidthDp.dp)
+                        .height(pieceHeight),
+                    draggingItem = draggingItem,
+                    onDraggingInScopeChange = {
+                        val trackIndex = tracks.size
 
-                var inScope by remember { mutableStateOf(false) }
-
-                fun calTarget(draggingItem: DraggingItem) = ((horizontalScrollState.value + draggingItem.position.x) / density - draggingItem.width.value / 2 - startAndEndPaddingDp).roundToInt().coerceAtLeast(0)
-
-                val blankPieceWidthDp = draggingItem?.let { calTarget(it) } ?: 0
-                currentPrecedingPaddingDp = blankPieceWidthDp
-                Box {
-                    AnimatedVisibility(
-                        visible = inScope && blankPieceWidthDp > 0,
-                        enter = fadeIn(), exit = fadeOut()
-                    ) {
-                        PieceCard(
-                            modifier = Modifier
-                                .alpha(0.5f)
-                                .padding(start = startAndEndPaddingDp.dp)
-                                .width(blankPieceWidthDp.dp)
-                                .height(pieceHeight),
-                        ) {}
-                    }
-
-                    DraggingItemDetector2(
-                        modifier = Modifier
-                            .padding(start = (horizontalScrollState.value / density).dp)
-                            .width(screenWidthDp.dp)
-                            .height(pieceHeight),
-                        draggingItem = draggingItem,
-                        onDraggingInScopeChange = {
-                            inScope = it
-
-                            val trackIndex = tracks.size
-
-                            if(it) {
-                                currentDroppingTarget = Pair(trackIndex, 0)
-                                inScopeTrackSet.add(trackIndex)
-                            } else {
-                                inScopeTrackSet.remove(trackIndex)
-                                if(inScopeTrackSet.isEmpty()) {
-                                    currentDroppingTarget = null
-                                }
+                        if(it) {
+                            currentDroppingTarget = Pair(trackIndex, 0)
+                            inScopeTrackSet.add(trackIndex)
+                        } else {
+                            inScopeTrackSet.remove(trackIndex)
+                            if(inScopeTrackSet.isEmpty()) {
+                                currentDroppingTarget = null
                             }
                         }
-                    ) {}
-                }
-
-
+                    }
+                )
             }
         }
 
@@ -467,6 +445,35 @@ fun Control(
         )
     }
 }
+
+@Composable
+fun BlankPieceAndDetector(
+    pieceModifier: Modifier,
+    detectorModifier: Modifier,
+    draggingItem: DraggingItem?,
+    onDraggingInScopeChange: (Boolean) -> Unit
+) {
+    var inScope by remember { mutableStateOf(false) }
+    Box {
+        AnimatedVisibility(
+            visible = inScope,
+            enter = fadeIn(), exit = fadeOut()
+        ) {
+            PieceCard(modifier = pieceModifier)
+        }
+
+        DraggingItemDetector(
+            modifier = detectorModifier,
+            draggingItem = draggingItem,
+            onDraggingInScopeChange = {
+                inScope = it
+
+                onDraggingInScopeChange.invoke(it)
+            }
+        )
+    }
+}
+
 
 @Composable
 fun EdgeDraggingDetector(
@@ -518,19 +525,18 @@ fun EdgeDraggingDetector(
                                      randomPoint: Offset,
                                      center: Offset,
                                      width: Float,
-                                     height: Float,
-                                     offset: Float) -> Boolean,
+                                     height: Float) -> Boolean,
                                  onDraggingInScopeChange: (Boolean) -> Unit ->
 
             val screenWidthDp = LocalConfiguration.current.screenWidthDp
-            DraggingItemDetector2(
+            DraggingItemDetector(
                 modifier = modifier
                     .fillMaxHeight()
                     .width(screenWidthDp.dp / 10),
                 draggingItem = draggingItem,
                 onDraggingInScopeChange = onDraggingInScopeChange,
                 isInScopeX = isInScopeX,
-                block = {}
+                content = {}
             )
         }
 
@@ -539,8 +545,7 @@ fun EdgeDraggingDetector(
             { randomPoint: Offset,
               center: Offset,
               width: Float,
-              _: Float,
-              _: Float ->
+              _: Float, ->
                 randomPoint.x < center.x + width / 2
             }) {
             inScope = if(it) -1 else 0
@@ -550,8 +555,7 @@ fun EdgeDraggingDetector(
             { randomPoint: Offset,
               center: Offset,
               width: Float,
-              _: Float,
-              _: Float ->
+              _: Float, ->
                 randomPoint.x > center.x - width / 2
             }
             ) {

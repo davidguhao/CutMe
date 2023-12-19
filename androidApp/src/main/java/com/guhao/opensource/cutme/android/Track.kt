@@ -1,8 +1,14 @@
 package com.guhao.opensource.cutme.android
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -18,7 +24,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
@@ -126,51 +137,91 @@ fun Track(
                 shouldAnimateDraggingItemBack = shouldAnimateDraggingItemBack
             )
         }
-        AddPieceButton(
-            draggingItem = draggingItem,
-            onDraggingInScopeChange = {
-                if(it) {
-                    onDraggingInScope.invoke(-1) // Use -1 to indicate adding to the end
-                    inScopePieceSet.add(-1)
-                } else {
-                    inScopePieceSet.remove(-1)
-                    if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
+
+        AnimatedContent(targetState = gotPieceFlying, label = "") { flying ->
+            if(flying) {
+                BlankPiece(
+                    modifier = Modifier.height(pieceHeight),
+                    draggingItem = draggingItem,
+                    onDraggingInScopeChange = {
+                        if(it) {
+                            onDraggingInScope.invoke(-1) // Use -1 to indicate adding to the end
+                            inScopePieceSet.add(-1)
+                        } else {
+                            inScopePieceSet.remove(-1)
+                            if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
+                        }
+                    })
+            } else {
+                AddPieceButton {
+                    requestAdding.invoke { result: List<SelectInfo> ->
+                        onTrackChange(Track(track.pieces + result.map {
+                            Piece(
+                                model = it.path, end = (it.duration?:2000) - 1) } ))
+                    }
                 }
-            },
-            enableDragDetector = !(gotPieceFlying && draggingItem != null && draggingItem.pieceIndex + 1 == track.pieces.size)
-        ) {
-            requestAdding.invoke { result: List<SelectInfo> ->
-                onTrackChange(Track(track.pieces + result.map {
-                    Piece(
-                        model = it.path, end = (it.duration?:2000) - 1) } ))
             }
         }
+
         Spacer(modifier = Modifier.width((maxTrackLengthDp / 2 - 48).dp))
     }
 }
 
 @Composable
-fun AddPieceButton(
-    draggingItem: DraggingItem?,
-    onDraggingInScopeChange: (Boolean) -> Unit,
-    enableDragDetector: Boolean = true,
+fun BlankPiece(
+    modifier: Modifier,
 
-    onClick: () -> Unit,
+    draggingItem: DraggingItem?,
+    onDraggingInScopeChange: (Boolean) -> Unit
 ) {
-    DraggingItemDetector(
-        enabled = enableDragDetector,
-        draggingItem = draggingItem,
-        onDraggingInScopeChange = onDraggingInScopeChange) {
-        IconButton(
-            modifier = Modifier
-                .padding(top = 10.dp, bottom = 10.dp, start = it),
-            onClick = onClick,
+    Box {
+        var currentRect by remember { mutableStateOf(Rect.Zero) }
+
+        val screenWidthDp = LocalConfiguration.current.screenWidthDp
+        val density = LocalDensity.current.density
+        val detectorWidth = (screenWidthDp - (currentRect.left / density).roundToInt()).dp
+        var inScope by remember { mutableStateOf(false) }
+        DraggingItemDetector(
+            modifier = modifier
+                .width(detectorWidth)
+                .onGloballyPositioned { layoutCoordinates ->
+                    currentRect = layoutCoordinates.boundsInWindow()
+                },
+            draggingItem = draggingItem,
+            onDraggingInScopeChange = {
+                inScope = it
+                onDraggingInScopeChange.invoke(it)
+            })
+
+        val draggingItemLeft = draggingItem?.let { it.position.x / density - it.width.value / 2 }?.coerceAtLeast(0f)
+        val blankPieceWidth = draggingItemLeft?.minus(currentRect.left / density)?.coerceAtLeast(0f) ?: 0f
+
+        AnimatedVisibility(
+            enter = fadeIn(), exit = fadeOut(),
+            visible = inScope
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add",
-                tint = Color.White)
+            PieceCard(
+                modifier = Modifier
+                    .height(pieceHeight)
+                    .width(blankPieceWidth.dp),
+                content = {}
+            )
         }
     }
+}
 
+@Composable
+fun AddPieceButton(
+    onClick: () -> Unit,
+) {
+    IconButton(
+        modifier = Modifier
+            .padding(top = 10.dp, bottom = 10.dp),
+        onClick = onClick,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Add,
+            contentDescription = "Add",
+            tint = Color.White)
+    }
 }

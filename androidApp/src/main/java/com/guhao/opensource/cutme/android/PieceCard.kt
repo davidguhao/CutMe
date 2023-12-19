@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PieceCard(
     modifier: Modifier = Modifier, // have to specify the alpha = 0.99f in normal cases.
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit = {}
 ) {
     Card(
         modifier = modifier.drawWithContent {

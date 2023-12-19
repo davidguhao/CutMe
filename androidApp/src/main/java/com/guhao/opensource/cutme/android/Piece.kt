@@ -16,7 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -283,7 +282,7 @@ fun Piece(
         }
     }
 
-    DraggingItemDetector(
+    TranslationXDraggingItemDetector(
         modifier = Modifier
             .zIndex(if (flying) 1f else 0f),
 
@@ -304,7 +303,7 @@ fun Piece(
         LaunchedEffect(key1 = scaleState) {
             fun scaleTo(target: Float) {
                 val overScaleExtent = 0.1f
-                val overScaleTarget = if(scale < target) target + overScaleExtent else target - overScaleExtent
+                val overScaleTarget = if(scale <= target) target + overScaleExtent else target - overScaleExtent
 
                 ValueAnimator.ofFloat(scale, overScaleTarget).apply {
                     duration = 80

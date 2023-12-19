@@ -31,67 +31,30 @@ fun isInScope(
     randomPoint: Offset,
     center: Offset,
     width: Float,
-    height: Float,
+    height: Float
+): Boolean {
 
-    offset: Float): Boolean {
-
-    val coverCenter = Offset(
-        x = center.x - offset / 2,
-        y = center.y
-    )
-
-    val xInScope = abs(randomPoint.x - coverCenter.x) < (offset + width) / 2
-    val yInScope = abs(randomPoint.y - coverCenter.y) < height / 2
+    val xInScope = abs(randomPoint.x - center.x) < width / 2
+    val yInScope = abs(randomPoint.y - center.y) < height / 2
 
     return xInScope && yInScope
 }
-@Composable
-fun DraggingItemHighFrequencyDetector(
-    modifier: Modifier = Modifier,
 
-    draggingItem: DraggingItem?,
-    onDraggingInScopeChange: (Boolean) -> Unit,
+@Composable
+fun DraggingItemDetector(
+    modifier: Modifier = Modifier,
 
     enabled: Boolean = true,
 
-    block: @Composable () -> Unit
-) {
-    var currentRect by remember { mutableStateOf(Rect.Zero) }
-    val draggingInScope = draggingItem?.let { enabled && isInScope(
-        randomPoint = it.position,
-
-        center = currentRect.center,
-        width = currentRect.width,
-        height = currentRect.height,
-
-        offset = 0f
-    ) }?: false
-
-    onDraggingInScopeChange(draggingInScope)
-
-    Box(modifier = modifier.onGloballyPositioned { layoutCoordinates ->
-        currentRect = layoutCoordinates.boundsInWindow()
-    }) {
-        block.invoke()
-    }
-}
-@Composable
-fun DraggingItemDetector2(
-    modifier: Modifier = Modifier,
-
     draggingItem: DraggingItem?,
-    onDraggingInScopeChange: (Boolean) -> Unit,
-
-    enabled: Boolean = true,
     isInScopeX: (
         randomPoint: Offset,
         center: Offset,
         width: Float,
-        height: Float,
+        height: Float) -> Boolean = ::isInScope,
+    onDraggingInScopeChange: (Boolean) -> Unit,
 
-        offset: Float) -> Boolean = ::isInScope,
-
-    block: @Composable () -> Unit
+    content: @Composable () -> Unit = {}
 ) {
     var currentRect by remember { mutableStateOf(Rect.Zero) }
     val draggingInScope = draggingItem?.let { enabled && isInScopeX(
@@ -100,8 +63,6 @@ fun DraggingItemDetector2(
         currentRect.center,
         currentRect.width,
         currentRect.height,
-
-        0f
     ) }?: false
     LaunchedEffect(key1 = draggingInScope) {
         onDraggingInScopeChange(draggingInScope)
@@ -110,14 +71,16 @@ fun DraggingItemDetector2(
     Box(modifier = modifier.onGloballyPositioned { layoutCoordinates ->
         currentRect = layoutCoordinates.boundsInWindow()
     }) {
-        block.invoke()
+        content.invoke()
     }
 }
+
 @Composable
-fun DraggingItemDetector(
+fun TranslationXDraggingItemDetector(
     modifier: Modifier = Modifier,
 
     enabled: Boolean = true,
+
     draggingItem: DraggingItem?,
 
     onOffsetChange: (Float) -> Unit = {},
@@ -125,37 +88,52 @@ fun DraggingItemDetector(
 
     block: @Composable (Dp) -> Unit
 ) {
-    var currentRect by remember { mutableStateOf(Rect.Zero) }
     var translationXForDragDp by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current.density
 
-    val draggingInScope = draggingItem?.let { enabled && isInScope(
-        randomPoint = it.position,
+    fun isInScopeOffset(
+        randomPoint: Offset,
+        center: Offset,
+        width: Float,
+        height: Float,
 
-        center = currentRect.center,
-        width = currentRect.width,
-        height = currentRect.height,
-
-        offset = translationXForDragDp * density
-    ) }?: false
-    LaunchedEffect(key1 = draggingInScope) {
-        onDraggingInScopeChange(draggingInScope)
-        val transTarget = if(draggingInScope) {
-            draggingItem!!.width.value
-        } else 0f
-
-        ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
-            duration = 250
-            addUpdateListener { animator ->
-                translationXForDragDp = animator.animatedValue as Float
-                onOffsetChange.invoke(-translationXForDragDp * density)
-            }
-        }.start()
+        offset: Float,
+    ): Boolean {
+        return isInScope(
+            randomPoint, center.copy(x = center.x - offset / 2), width + offset, height)
     }
 
-    Box(modifier = modifier.onGloballyPositioned { layoutCoordinates ->
-        currentRect = layoutCoordinates.boundsInWindow()
-    }) {
-        block.invoke(translationXForDragDp.dp)
-    }
+    DraggingItemDetector(
+        modifier = modifier,
+        enabled = enabled,
+        draggingItem = draggingItem,
+        isInScopeX = { randomPoint, center, width, height ->
+
+            isInScopeOffset(
+                randomPoint = randomPoint,
+                center = center,
+                width = width,
+                height = height,
+                offset = translationXForDragDp * density
+            )
+        },
+        onDraggingInScopeChange = { draggingInScope ->
+
+            onDraggingInScopeChange(draggingInScope)
+            val transTarget = if(draggingInScope) {
+                draggingItem!!.width.value
+            } else 0f
+
+            ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
+                duration = 250
+                addUpdateListener { animator ->
+                    translationXForDragDp = animator.animatedValue as Float
+                    onOffsetChange.invoke(-translationXForDragDp * density)
+                }
+            }.start()
+        },
+        content = {
+            block.invoke(translationXForDragDp.dp)
+        }
+    )
 }
