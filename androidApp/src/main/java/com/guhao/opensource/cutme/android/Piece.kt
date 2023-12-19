@@ -40,6 +40,8 @@ import androidx.compose.ui.input.pointer.positionChangedIgnoreConsumed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -295,16 +297,22 @@ fun Piece(
         var currentCompensation by remember { mutableFloatStateOf(0f) }
         currentCompensation = piecesPaddingCompensationX + scrollingCompensationX - scrollingCompensationXRemoveProcess
 
-        var scale by remember { mutableFloatStateOf(1f) }
-        val scaleState = if(selected) ScaleState.SELECTED
-        else if(flying) {
-            if(hasDroppingTarget.invoke()) {
-                ScaleState.ORIGINAL
-            } else
-                ScaleState.FLYING
-        }
-        else ScaleState.ORIGINAL
+        val screenWidth = LocalConfiguration.current.screenWidthDp
+        val density = LocalDensity.current.density
+        val centerX = screenWidth * density / 2
+        val isProgressLineOver = currentRect.left < centerX && currentRect.right > centerX
 
+        val scaleState = if(isProgressLineOver) ScaleState.ORIGINAL
+            else if(selected) ScaleState.SELECTED
+            else if(flying) {
+                if(hasDroppingTarget.invoke()) {
+                    ScaleState.ORIGINAL
+                } else
+                    ScaleState.FLYING
+            } else ScaleState.ORIGINAL
+
+
+        var scale by remember { mutableFloatStateOf(1f) }
         LaunchedEffect(key1 = scaleState) {
             fun scaleTo(target: Float) {
                 val overScaleExtent = 0.1f
