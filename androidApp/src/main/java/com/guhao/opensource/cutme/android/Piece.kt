@@ -302,14 +302,13 @@ fun Piece(
         val centerX = screenWidth * density / 2
         val isProgressLineOver = currentRect.left < centerX && currentRect.right > centerX
 
-        val scaleState = if(isProgressLineOver) ScaleState.ORIGINAL
-            else if(selected) ScaleState.SELECTED
-            else if(flying) {
+        val scaleState = if(flying) {
                 if(hasDroppingTarget.invoke()) {
                     ScaleState.ORIGINAL
                 } else
                     ScaleState.FLYING
-            } else ScaleState.ORIGINAL
+            } else if(isProgressLineOver) ScaleState.ORIGINAL
+            else if(selected) ScaleState.SELECTED else ScaleState.ORIGINAL
 
 
         var scale by remember { mutableFloatStateOf(1f) }
