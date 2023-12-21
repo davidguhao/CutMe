@@ -243,6 +243,11 @@ fun ZoomBox(
     }, content = content)
 }
 
+data class AnimationConcatenation(
+    val animationStartPosition: Offset,
+    val position: Pair<Int, Int>
+)
+
 @Composable
 fun Control(
     modifier: Modifier = Modifier,
@@ -260,6 +265,7 @@ fun Control(
 
     var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var animationConcatenation by remember { mutableStateOf<AnimationConcatenation?>(null) }
 
     val currentTracks by remember { mutableStateOf<List<Track>>(listOf()) }.also {
         it.value = tracks
@@ -294,6 +300,8 @@ fun Control(
         val inScopeTrackSet = remember { HashSet<Int>() }
         var hasFlyingPieceTrackSet by remember { mutableStateOf(setOf<Int>()) }
         val hasPieceFlying = hasFlyingPieceTrackSet.isNotEmpty()
+
+        var draggingEndPosition by remember { mutableStateOf(Offset.Zero) }
 
         var xPosOnDragItemCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
         LazyColumn(
@@ -336,7 +344,7 @@ fun Control(
                             // Currently the 'item' will be null, don't use it.
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
-
+                                draggingEndPosition = draggingItem!!.position
                                 onTracksChangeInControl.invoke(
                                     currentTracks.move(
                                         initialPos,
@@ -345,6 +353,9 @@ fun Control(
                                             (totalDuration * (newTrackPrecedingPaddingDp / zoom) / maxTrackLengthDp.toFloat()).roundToLong()
                                         } else null
                                     ))
+                                animationConcatenation = AnimationConcatenation(
+                                    animationStartPosition = draggingItem!!.position,
+                                    position = targetPos)
                             }
                         }
 
@@ -357,7 +368,13 @@ fun Control(
                         draggingItem = item?.copy(trackIndex = trackIndex)
                     },
                     onDraggingInScope = { pieceIndex ->
-                        currentDroppingTarget = Pair(trackIndex, pieceIndex)
+                        Pair(trackIndex, pieceIndex).let {
+                            currentDroppingTarget = it
+                            animationConcatenation = AnimationConcatenation(
+                                animationStartPosition = draggingItem!!.position,
+                                position = it)
+                        }
+
                         inScopeTrackSet.add(trackIndex)
                     },
                     onInScopePiecesClear = {
@@ -375,7 +392,9 @@ fun Control(
                     onHasPieceFlying = {
                         if(it) hasFlyingPieceTrackSet += trackIndex
                         else hasFlyingPieceTrackSet -= trackIndex
-                    }
+                    },
+
+                    animationConcatenation = if(animationConcatenation?.position?.first == trackIndex) animationConcatenation else null,
                 )
             }
 
@@ -418,7 +437,7 @@ fun Control(
                             val trackIndex = tracks.size
 
                             if(it) {
-                                currentDroppingTarget = Pair(trackIndex, 0)
+                                currentDroppingTarget = Pair(trackIndex, 1)
                                 inScopeTrackSet.add(trackIndex)
                             } else {
                                 inScopeTrackSet.remove(trackIndex)

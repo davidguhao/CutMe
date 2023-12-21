@@ -49,6 +49,7 @@ import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -222,6 +223,7 @@ val pieceHeight = 70.dp
 enum class ScaleState {
     ORIGINAL, SELECTED, FLYING
 }
+const val ANIMATION_DURATION = 250L // In milliseconds
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
@@ -246,8 +248,39 @@ fun Piece(
     onDraggingInScopeChange: (Boolean) -> Unit,
     enableDraggingDetector: Boolean,
 
-    hasDroppingTarget: () -> Boolean
+    hasDroppingTarget: () -> Boolean,
+
+    animationConcatenation: AnimationConcatenation?,
 ) {
+    var currentRect by remember { mutableStateOf(Rect.Zero) }
+
+    var animationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
+
+
+    LaunchedEffect(key1 = animationConcatenation) {
+        if(animationConcatenation == null || draggingItem != null) return@LaunchedEffect
+
+        val startPosOffset = animationConcatenation.animationStartPosition.let {
+            val x = it.x - currentRect.center.x
+            val y = it.y - currentRect.center.y
+            Offset(x, y)
+        }
+
+        ValueAnimator.ofFloat(startPosOffset.x, 0f).apply {
+            duration = ANIMATION_DURATION
+            addUpdateListener {
+                animationConcatenationOffset = animationConcatenationOffset.copy(x = it.animatedValue as Float)
+            }
+        }.start()
+
+        ValueAnimator.ofFloat(startPosOffset.y, 0f).apply {
+            duration = ANIMATION_DURATION
+            addUpdateListener {
+                animationConcatenationOffset = animationConcatenationOffset.copy(y = it.animatedValue as Float)
+            }
+        }.start()
+
+    }
     var draggingOffset by draggingOffsetState
     val flying = draggingOffset != Offset.Zero
 
@@ -264,7 +297,7 @@ fun Piece(
             ValueAnimator
                 .ofFloat(draggingOffset.x, 0f)
                 .apply {
-                    duration = 250
+                    duration = ANIMATION_DURATION
                     addUpdateListener {
                         draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
                     }
@@ -272,12 +305,12 @@ fun Piece(
                 .start()
 
             ValueAnimator.ofFloat(scrollingCompensationXRemoveProcess, currentTotalCompensation).apply {
-                duration = 250
+                duration = ANIMATION_DURATION
                 addUpdateListener { scrollingCompensationXRemoveProcess = it.animatedValue as Float }
             }.start()
 
             ValueAnimator.ofFloat(draggingOffset.y, 0f).apply {
-                duration = 250
+                duration = ANIMATION_DURATION
                 addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
             }.start()
         }
@@ -293,7 +326,6 @@ fun Piece(
         onDraggingInScopeChange = onDraggingInScopeChange
     ) { shouldPadding ->
 
-        var currentRect by remember { mutableStateOf(Rect.Zero) }
         var currentCompensation by remember { mutableFloatStateOf(0f) }
         currentCompensation = piecesPaddingCompensationX + scrollingCompensationX - scrollingCompensationXRemoveProcess
 
@@ -340,7 +372,9 @@ fun Piece(
             }
         }
         PieceCard(modifier = Modifier
-            .onGloballyPositioned { currentRect = it.boundsInWindow() } // I need to know its position even if it is out of the window we are using.
+            .onGloballyPositioned {
+                currentRect = it.boundsInWindow()
+            } // I need to know its position even if it is out of the window we are using.
             .padding(start = shouldPadding)
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(
@@ -377,8 +411,8 @@ fun Piece(
             }
             .offset {
                 IntOffset(
-                    x = (draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(flying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
-                    y = draggingOffset.y.roundToInt()
+                    x = (animationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if (flying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
+                    y = (animationConcatenationOffset.y + draggingOffset.y).roundToInt()
                 )
             } // Pixel
             .graphicsLayer(

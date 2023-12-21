@@ -64,7 +64,9 @@ fun Track(
     scrollingCompensationX: Int,
 
     hasPieceFlying: Boolean, // Globally
-    onHasPieceFlying: (Boolean) -> Unit // This will be called directly.
+    onHasPieceFlying: (Boolean) -> Unit, // This will be called directly.
+
+    animationConcatenation: AnimationConcatenation?,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -138,7 +140,9 @@ fun Track(
                 },
                 enableDraggingDetector = currentDraggingIndex?.let { index != it + 1 } ?: true,
 
-                hasDroppingTarget = hasDroppingTarget
+                hasDroppingTarget = hasDroppingTarget,
+
+                animationConcatenation = if(animationConcatenation?.position?.second == index) animationConcatenation else null,
             )
         }
 
