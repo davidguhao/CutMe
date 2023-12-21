@@ -283,10 +283,17 @@ fun Piece(
     }
     var draggingOffset by draggingOffsetState
 
-    val flying = draggingOffset != Offset.Zero
 
     val actualWidth = width * zoom
     var scrollingCompensationXRemoveProcess by remember { mutableFloatStateOf(0f) }
+
+    val draggingCausedFlying = draggingOffset != Offset.Zero
+    val offset = IntOffset(
+        x = (animationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(draggingCausedFlying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
+        y = (animationConcatenationOffset.y + draggingOffset.y).roundToInt()
+    )
+    val flying = offset != IntOffset.Zero
+
     val currentTotalCompensation by remember { mutableFloatStateOf(piecesPaddingCompensationX + scrollingCompensationX) }.also {
         it.floatValue = piecesPaddingCompensationX + scrollingCompensationX
     }
@@ -411,10 +418,7 @@ fun Piece(
                 )
             }
             .offset {
-                IntOffset(
-                    x = (animationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if (flying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
-                    y = (animationConcatenationOffset.y + draggingOffset.y).roundToInt()
-                )
+                offset
             } // Pixel
             .graphicsLayer(
                 alpha = 0.99f,
