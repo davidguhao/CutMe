@@ -282,6 +282,7 @@ fun Piece(
 
     }
     var draggingOffset by draggingOffsetState
+
     val flying = draggingOffset != Offset.Zero
 
     val actualWidth = width * zoom

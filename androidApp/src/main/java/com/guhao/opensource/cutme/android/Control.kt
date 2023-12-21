@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -291,8 +292,10 @@ fun Control(
         var newTrackPrecedingPaddingDp by remember { mutableIntStateOf(0) }
 
         val totalDuration = tracks.longestDuration()
+        val latestTotalDuration = remember { mutableLongStateOf(totalDuration) }.apply { longValue = totalDuration }
         val onTracksChangeInControl = { newTracks: List<Track> ->
-            if(totalDuration > 0) zoom *= (newTracks.longestDuration() / totalDuration.toFloat())
+            val ltd = latestTotalDuration.longValue
+            if(ltd > 0) zoom *= (newTracks.longestDuration() / ltd.toFloat())
 
             onTracksChange.invoke(newTracks)
         }
