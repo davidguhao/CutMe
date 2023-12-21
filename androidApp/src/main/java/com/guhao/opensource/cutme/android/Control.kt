@@ -292,6 +292,8 @@ fun Control(
         }
 
         val inScopeTrackSet = remember { HashSet<Int>() }
+        var hasFlyingPieceTrackSet by remember { mutableStateOf(setOf<Int>()) }
+        val hasPieceFlying = hasFlyingPieceTrackSet.isNotEmpty()
 
         var xPosOnDragItemCreated by remember { mutableIntStateOf(horizontalScrollState.value) }
         LazyColumn(
@@ -368,6 +370,12 @@ fun Control(
 
                     maxTrackLengthDp = maxTrackLengthDp,
                     scrollingCompensationX = scrollingCompensationX,
+
+                    hasPieceFlying = hasPieceFlying,
+                    onHasPieceFlying = {
+                        if(it) hasFlyingPieceTrackSet += trackIndex
+                        else hasFlyingPieceTrackSet -= trackIndex
+                    }
                 )
             }
 

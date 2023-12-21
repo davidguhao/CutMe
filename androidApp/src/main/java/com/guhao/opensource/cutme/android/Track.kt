@@ -62,13 +62,17 @@ fun Track(
 
     maxTrackLengthDp: Int,
     scrollingCompensationX: Int,
+
+    hasPieceFlying: Boolean, // Globally
+    onHasPieceFlying: (Boolean) -> Unit // This will be called directly.
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
-    val gotPieceFlying = draggingOffsetMap.values.any { it.value != Offset.Zero }
+    val gotPieceFlyingInThisTrack = draggingOffsetMap.values.any { it.value != Offset.Zero }
+    onHasPieceFlying.invoke(gotPieceFlyingInThisTrack)
     Row(
         modifier = Modifier
-            .zIndex(if (gotPieceFlying) 1f else 0f)
+            .zIndex(if (gotPieceFlyingInThisTrack) 1f else 0f)
             .fillMaxWidth()
             .padding(vertical = 10.dp)
     ) {
@@ -138,7 +142,7 @@ fun Track(
             )
         }
 
-        AnimatedContent(targetState = gotPieceFlying, label = "") { flying ->
+        AnimatedContent(targetState = hasPieceFlying, label = "") { flying ->
             if(flying) {
                 BlankPiece(
                     modifier = Modifier.height(pieceHeight),
