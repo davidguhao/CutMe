@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,7 +50,6 @@ import androidx.compose.ui.zIndex
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class Piece(
@@ -250,17 +250,26 @@ fun Piece(
 
     hasDroppingTarget: () -> Boolean,
 
-    animationConcatenation: AnimationConcatenation?,
+    originalPosAnimationConcatenation: Int?,
+    targetPosAnimationConcatenation: Offset?,
 ) {
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
-    var animationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
+    var originalAnimationConcatenationPadding by remember { mutableIntStateOf(0) }
+    LaunchedEffect(key1 = originalPosAnimationConcatenation) {
+        if(originalPosAnimationConcatenation == null || draggingItem != null) return@LaunchedEffect
 
+        ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
+            duration = ANIMATION_DURATION
+            addUpdateListener { originalAnimationConcatenationPadding = it.animatedValue as Int }
+        }.start()
+    }
 
-    LaunchedEffect(key1 = animationConcatenation) {
-        if(animationConcatenation == null || draggingItem != null) return@LaunchedEffect
+    var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(key1 = targetPosAnimationConcatenation) {
+        if(targetPosAnimationConcatenation == null || draggingItem != null) return@LaunchedEffect
 
-        val startPosOffset = animationConcatenation.animationStartPosition.let {
+        val startPosOffset = targetPosAnimationConcatenation.let {
             val x = it.x - currentRect.center.x
             val y = it.y - currentRect.center.y
             Offset(x, y)
@@ -269,14 +278,14 @@ fun Piece(
         ValueAnimator.ofFloat(startPosOffset.x, 0f).apply {
             duration = ANIMATION_DURATION
             addUpdateListener {
-                animationConcatenationOffset = animationConcatenationOffset.copy(x = it.animatedValue as Float)
+                targetAnimationConcatenationOffset = targetAnimationConcatenationOffset.copy(x = it.animatedValue as Float)
             }
         }.start()
 
         ValueAnimator.ofFloat(startPosOffset.y, 0f).apply {
             duration = ANIMATION_DURATION
             addUpdateListener {
-                animationConcatenationOffset = animationConcatenationOffset.copy(y = it.animatedValue as Float)
+                targetAnimationConcatenationOffset = targetAnimationConcatenationOffset.copy(y = it.animatedValue as Float)
             }
         }.start()
 
@@ -289,8 +298,8 @@ fun Piece(
 
     val draggingCausedFlying = draggingOffset != Offset.Zero
     val offset = IntOffset(
-        x = (animationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(draggingCausedFlying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
-        y = (animationConcatenationOffset.y + draggingOffset.y).roundToInt()
+        x = (targetAnimationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(draggingCausedFlying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
+        y = (targetAnimationConcatenationOffset.y + draggingOffset.y).roundToInt()
     )
     val flying = offset != IntOffset.Zero
 
@@ -383,7 +392,7 @@ fun Piece(
             .onGloballyPositioned {
                 currentRect = it.boundsInWindow()
             } // I need to know its position even if it is out of the window we are using.
-            .padding(start = shouldPadding)
+            .padding(start = shouldPadding + originalAnimationConcatenationPadding.dp)
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(
                     onDragStart = {

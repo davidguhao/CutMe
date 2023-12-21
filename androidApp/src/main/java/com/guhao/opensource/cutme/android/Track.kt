@@ -67,7 +67,8 @@ fun Track(
     hasPieceFlying: Boolean, // Globally
     onHasPieceFlying: (Boolean) -> Unit, // This will be called directly.
 
-    animationConcatenation: AnimationConcatenation?,
+    originalPosAnimationConcatenation: AnimationConcatenation?,
+    targetPosAnimationConcatenation: AnimationConcatenation?,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -143,7 +144,8 @@ fun Track(
 
                 hasDroppingTarget = hasDroppingTarget,
 
-                animationConcatenation = if(animationConcatenation?.position?.second == index) animationConcatenation else null,
+                originalPosAnimationConcatenation = if(originalPosAnimationConcatenation?.originalPosition?.second == index) originalPosAnimationConcatenation.shouldPaddingForOriginal else null,
+                targetPosAnimationConcatenation = if(targetPosAnimationConcatenation?.targetPosition?.second == index) targetPosAnimationConcatenation.animationStartPositionForTarget else null,
             )
         }
 

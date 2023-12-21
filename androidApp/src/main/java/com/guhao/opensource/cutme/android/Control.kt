@@ -245,8 +245,11 @@ fun ZoomBox(
 }
 
 data class AnimationConcatenation(
-    val animationStartPosition: Offset,
-    val position: Pair<Int, Int>
+    val originalPosition: Pair<Int, Int>,
+    val shouldPaddingForOriginal: Int,
+
+    val targetPosition: Pair<Int, Int>,
+    val animationStartPositionForTarget: Offset,
 )
 
 @Composable
@@ -357,8 +360,11 @@ fun Control(
                                         } else null
                                     ))
                                 animationConcatenation = AnimationConcatenation(
-                                    animationStartPosition = draggingItem!!.position,
-                                    position = targetPos)
+                                    originalPosition = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
+                                    shouldPaddingForOriginal = draggingItem!!.width.value.roundToInt(),
+
+                                    animationStartPositionForTarget = draggingItem!!.position,
+                                    targetPosition = targetPos)
                             }
                         }
 
@@ -371,11 +377,14 @@ fun Control(
                         draggingItem = item?.copy(trackIndex = trackIndex)
                     },
                     onDraggingInScope = { pieceIndex ->
-                        Pair(trackIndex, pieceIndex).let {
-                            currentDroppingTarget = it
+                        Pair(trackIndex, pieceIndex).let { droppingTarget ->
+                            currentDroppingTarget = droppingTarget
                             animationConcatenation = AnimationConcatenation(
-                                animationStartPosition = draggingItem!!.position,
-                                position = it)
+                                originalPosition = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
+                                shouldPaddingForOriginal = draggingItem!!.width.value.roundToInt(),
+
+                                animationStartPositionForTarget = draggingItem!!.position,
+                                targetPosition = droppingTarget)
                         }
 
                         inScopeTrackSet.add(trackIndex)
@@ -397,7 +406,8 @@ fun Control(
                         else hasFlyingPieceTrackSet -= trackIndex
                     },
 
-                    animationConcatenation = if(animationConcatenation?.position?.first == trackIndex) animationConcatenation else null,
+                    originalPosAnimationConcatenation = if(animationConcatenation?.originalPosition?.first == trackIndex) animationConcatenation else null,
+                    targetPosAnimationConcatenation = if(animationConcatenation?.targetPosition?.first == trackIndex) animationConcatenation else null,
                 )
             }
 
