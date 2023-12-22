@@ -256,39 +256,54 @@ fun Piece(
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
     var originalAnimationConcatenationPadding by remember { mutableIntStateOf(0) }
-    LaunchedEffect(key1 = originalPosAnimationConcatenation) {
-        if(originalPosAnimationConcatenation == null || draggingItem != null) return@LaunchedEffect
-
-        ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
-            duration = ANIMATION_DURATION
-            addUpdateListener { originalAnimationConcatenationPadding = it.animatedValue as Int }
-        }.start()
+    if(originalPosAnimationConcatenation != null && draggingItem == null) {
+        var currentAnimationConcatenation by remember { mutableStateOf<Int?>(null) }
+        if(currentAnimationConcatenation != originalPosAnimationConcatenation) {
+            originalAnimationConcatenationPadding = originalPosAnimationConcatenation // Flash to the starting point!
+            currentAnimationConcatenation = originalPosAnimationConcatenation
+        }
+        LaunchedEffect(key1 = originalPosAnimationConcatenation) {
+            ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    originalAnimationConcatenationPadding = it.animatedValue as Int
+                }
+            }.start()
+        }
     }
 
+    fun Offset.calCurrentOffset(): Offset {
+        val x = this.x - currentRect.center.x
+        val y = this.y - currentRect.center.y
+        return Offset(x = x, y = y)
+    }
     var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
-    LaunchedEffect(key1 = targetPosAnimationConcatenation) {
-        if(targetPosAnimationConcatenation == null || draggingItem != null) return@LaunchedEffect
-
-        val startPosOffset = targetPosAnimationConcatenation.let {
-            val x = it.x - currentRect.center.x
-            val y = it.y - currentRect.center.y
-            Offset(x, y)
+    if(targetPosAnimationConcatenation != null && draggingItem == null) {
+        var currentAnimationConcatenation by remember { mutableStateOf<Offset?>(null) }
+        if(currentAnimationConcatenation != targetPosAnimationConcatenation) {
+            targetAnimationConcatenationOffset = targetPosAnimationConcatenation.calCurrentOffset() // Flash to the starting point!
+            currentAnimationConcatenation = targetPosAnimationConcatenation // Save it
         }
 
-        ValueAnimator.ofFloat(startPosOffset.x, 0f).apply {
-            duration = ANIMATION_DURATION
-            addUpdateListener {
-                targetAnimationConcatenationOffset = targetAnimationConcatenationOffset.copy(x = it.animatedValue as Float)
-            }
-        }.start()
+        LaunchedEffect(key1 = targetPosAnimationConcatenation) {
 
-        ValueAnimator.ofFloat(startPosOffset.y, 0f).apply {
-            duration = ANIMATION_DURATION
-            addUpdateListener {
-                targetAnimationConcatenationOffset = targetAnimationConcatenationOffset.copy(y = it.animatedValue as Float)
-            }
-        }.start()
+            ValueAnimator.ofFloat(targetAnimationConcatenationOffset.x, 0f).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    targetAnimationConcatenationOffset =
+                        targetAnimationConcatenationOffset.copy(x = it.animatedValue as Float)
+                }
+            }.start()
 
+            ValueAnimator.ofFloat(targetAnimationConcatenationOffset.y, 0f).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    targetAnimationConcatenationOffset =
+                        targetAnimationConcatenationOffset.copy(y = it.animatedValue as Float)
+                }
+            }.start()
+
+        }
     }
     var draggingOffset by draggingOffsetState
 
