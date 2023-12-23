@@ -245,10 +245,10 @@ fun ZoomBox(
 }
 
 data class AnimationConcatenation(
-    val originalPosition: Pair<Int, Int>,
+    val originalPosition: Pair<Int, Int>?, // null if not exist anymore
     val shouldPaddingForOriginal: Int,
 
-    val targetPosition: Pair<Int, Int>,
+    val targetPosition: Pair<Int, Int>?, // null if not exist anymore
     val animationStartPositionForTarget: Offset,
 )
 
@@ -407,7 +407,17 @@ fun Control(
                     },
 
                     originalPosAnimationConcatenation = if(animationConcatenation?.originalPosition?.first == trackIndex) animationConcatenation else null,
+                    onOriginalPosAnimationConcatenationFinish = {
+                        animationConcatenation = animationConcatenation?.copy(
+                            originalPosition = null
+                        )
+                    },
                     targetPosAnimationConcatenation = if(animationConcatenation?.targetPosition?.first == trackIndex) animationConcatenation else null,
+                    onTargetPosAnimationConcatenationFinished = {
+                        animationConcatenation = animationConcatenation?.copy(
+                            targetPosition = null
+                        )
+                    }
                 )
             }
 

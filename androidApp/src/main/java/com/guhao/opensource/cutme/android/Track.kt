@@ -68,7 +68,10 @@ fun Track(
     onHasPieceFlying: (Boolean) -> Unit, // This will be called directly.
 
     originalPosAnimationConcatenation: AnimationConcatenation?,
+    onOriginalPosAnimationConcatenationFinish: () -> Unit,
+
     targetPosAnimationConcatenation: AnimationConcatenation?,
+    onTargetPosAnimationConcatenationFinished: () -> Unit,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -93,7 +96,7 @@ fun Track(
             val pieceWidth = (maxTrackLengthDp * (piece.duration / totalDuration.toFloat())).roundToInt().dp
 
             val draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap[index] = it }
-            val flying = draggingOffsetState.value != Offset.Zero
+            val draggingCausedFlying = draggingOffsetState.value != Offset.Zero
 
             Piece(
                 zoom = zoom,
@@ -118,8 +121,8 @@ fun Track(
                         null
                     } else index
                 },
-                scrollingCompensationX = if(flying) scrollingCompensationX else 0,
-                piecesPaddingCompensationX = if(flying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
+                scrollingCompensationX = if(draggingCausedFlying) scrollingCompensationX else 0,
+                piecesPaddingCompensationX = if(draggingCausedFlying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
                 onPiecesPaddingCompensationXChange = { x ->
                     compensationMap.apply {
                         val ready = Pair(index, x)
@@ -145,7 +148,9 @@ fun Track(
                 hasDroppingTarget = hasDroppingTarget,
 
                 originalPosAnimationConcatenation = if(originalPosAnimationConcatenation?.originalPosition?.second == index) originalPosAnimationConcatenation.shouldPaddingForOriginal else null,
+                onOriginalPosAnimationConcatenationFinished = onOriginalPosAnimationConcatenationFinish,
                 targetPosAnimationConcatenation = if(targetPosAnimationConcatenation?.targetPosition?.second == index) targetPosAnimationConcatenation.animationStartPositionForTarget else null,
+                onTargetPosAnimationConcatenationFinished = onTargetPosAnimationConcatenationFinished,
             )
         }
 

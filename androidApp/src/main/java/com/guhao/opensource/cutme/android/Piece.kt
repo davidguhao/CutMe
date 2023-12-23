@@ -46,7 +46,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.zIndex
+import androidx.core.animation.addListener
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import kotlin.coroutines.cancellation.CancellationException
@@ -225,6 +227,39 @@ enum class ScaleState {
 }
 const val ANIMATION_DURATION = 250L // In milliseconds
 
+@Composable
+fun OriginalPosAnimation(
+    originalPosAnimationConcatenation: Int?,
+    onPaddingChange: (Int) -> Unit,
+    draggingItem: DraggingItem?,
+
+    onAnimationFinish: () -> Unit
+) {
+    if(originalPosAnimationConcatenation != null && draggingItem == null) {
+        var currentAnimationConcatenation by remember { mutableStateOf<Int?>(null) }
+        if(currentAnimationConcatenation != originalPosAnimationConcatenation) {
+            onPaddingChange.invoke(originalPosAnimationConcatenation) // Flash to the starting point!
+            currentAnimationConcatenation = originalPosAnimationConcatenation
+        }
+        LaunchedEffect(key1 = originalPosAnimationConcatenation) {
+            ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    onPaddingChange.invoke(it.animatedValue as Int)
+                }
+                addListener(
+                    onEnd = {
+                        onAnimationFinish.invoke()
+                    },
+                    onCancel = {
+                        onAnimationFinish.invoke()
+                    }
+                )
+            }.start()
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalGlideComposeApi::class)
 @Composable
 fun Piece(
@@ -251,33 +286,32 @@ fun Piece(
     hasDroppingTarget: () -> Boolean,
 
     originalPosAnimationConcatenation: Int?,
+    onOriginalPosAnimationConcatenationFinished: () -> Unit,
     targetPosAnimationConcatenation: Offset?,
+    onTargetPosAnimationConcatenationFinished: () -> Unit,
 ) {
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
     var originalAnimationConcatenationPadding by remember { mutableIntStateOf(0) }
-    if(originalPosAnimationConcatenation != null && draggingItem == null) {
-        var currentAnimationConcatenation by remember { mutableStateOf<Int?>(null) }
-        if(currentAnimationConcatenation != originalPosAnimationConcatenation) {
-            originalAnimationConcatenationPadding = originalPosAnimationConcatenation // Flash to the starting point!
-            currentAnimationConcatenation = originalPosAnimationConcatenation
-        }
-        LaunchedEffect(key1 = originalPosAnimationConcatenation) {
-            ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
-                duration = ANIMATION_DURATION
-                addUpdateListener {
-                    originalAnimationConcatenationPadding = it.animatedValue as Int
-                }
-            }.start()
-        }
-    }
+    OriginalPosAnimation(
+        originalPosAnimationConcatenation = originalPosAnimationConcatenation,
+        onPaddingChange = { originalAnimationConcatenationPadding = it },
+        draggingItem = draggingItem,
+        onAnimationFinish = onOriginalPosAnimationConcatenationFinished
+    )
+
+    var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
 
     fun Offset.calCurrentOffset(): Offset {
-        val x = this.x - currentRect.center.x
-        val y = this.y - currentRect.center.y
-        return Offset(x = x, y = y)
+        return if(currentRect.center != Offset.Zero) {
+            val x = this.x - currentRect.center.x
+            val y = this.y - currentRect.center.y
+            Offset(x = x, y = y)
+        } else {
+            // So if we can't know its exact position, we just can't do anything on it...
+            Offset.Zero
+        }
     }
-    var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
     if(targetPosAnimationConcatenation != null && draggingItem == null) {
         var currentAnimationConcatenation by remember { mutableStateOf<Offset?>(null) }
         if(currentAnimationConcatenation != targetPosAnimationConcatenation) {
@@ -293,6 +327,13 @@ fun Piece(
                     targetAnimationConcatenationOffset =
                         targetAnimationConcatenationOffset.copy(x = it.animatedValue as Float)
                 }
+                addListener(
+                    onEnd = {
+                        onTargetPosAnimationConcatenationFinished.invoke()
+                    },
+                    onCancel = {
+                        onTargetPosAnimationConcatenationFinished.invoke()
+                    })
             }.start()
 
             ValueAnimator.ofFloat(targetAnimationConcatenationOffset.y, 0f).apply {
@@ -301,27 +342,32 @@ fun Piece(
                     targetAnimationConcatenationOffset =
                         targetAnimationConcatenationOffset.copy(y = it.animatedValue as Float)
                 }
+                addListener(
+                    onEnd = {
+                        onTargetPosAnimationConcatenationFinished.invoke()
+                    },
+                    onCancel = {
+                        onTargetPosAnimationConcatenationFinished.invoke()
+                    })
             }.start()
 
         }
     }
+
     var draggingOffset by draggingOffsetState
 
-
-    val actualWidth = width * zoom
-    var scrollingCompensationXRemoveProcess by remember { mutableFloatStateOf(0f) }
-
-    val draggingCausedFlying = draggingOffset != Offset.Zero
-    val offset = IntOffset(
-        x = (targetAnimationConcatenationOffset.x + draggingOffset.x + piecesPaddingCompensationX + scrollingCompensationX - if(draggingCausedFlying) scrollingCompensationXRemoveProcess else 0f).roundToInt(),
+    val totalCompensationX = piecesPaddingCompensationX + scrollingCompensationX
+    var scrollingCompensationXRemoveProcess by remember { mutableIntStateOf(0) }
+    var offset by remember { mutableStateOf(IntOffset.Zero) }
+    offset = IntOffset(
+        x = (targetAnimationConcatenationOffset.x + draggingOffset.x + totalCompensationX - scrollingCompensationXRemoveProcess).roundToInt(),
         y = (targetAnimationConcatenationOffset.y + draggingOffset.y).roundToInt()
     )
     val flying = offset != IntOffset.Zero
 
-    val currentTotalCompensation by remember { mutableFloatStateOf(piecesPaddingCompensationX + scrollingCompensationX) }.also {
-        it.floatValue = piecesPaddingCompensationX + scrollingCompensationX
+    val latestScrollingCompensationX by remember { mutableIntStateOf(scrollingCompensationX) }.also {
+        it.intValue = scrollingCompensationX
     }
-
     val returnToOldPlace = {
         if(hasDroppingTarget.invoke()) {
             draggingOffset = Offset.Zero // Flash back
@@ -336,18 +382,37 @@ fun Piece(
                 }
                 .start()
 
-            ValueAnimator.ofFloat(scrollingCompensationXRemoveProcess, currentTotalCompensation).apply {
+            if(latestScrollingCompensationX > 0) ValueAnimator.ofInt(scrollingCompensationXRemoveProcess, latestScrollingCompensationX).apply {
                 duration = ANIMATION_DURATION
-                addUpdateListener { scrollingCompensationXRemoveProcess = it.animatedValue as Float }
+                addUpdateListener {
+                    scrollingCompensationXRemoveProcess = it.animatedValue as Int
+                }
+                addListener(
+                    onEnd = {
+                        scrollingCompensationXRemoveProcess = 0
+                    },
+                    onCancel = {
+                        scrollingCompensationXRemoveProcess = 0
+                    }
+                )
             }.start()
 
             ValueAnimator.ofFloat(draggingOffset.y, 0f).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
+                addListener(
+                    onEnd = {
+                        scrollingCompensationXRemoveProcess = 0
+                    },
+                    onCancel = {
+                        scrollingCompensationXRemoveProcess = 0
+                    }
+                )
             }.start()
         }
     }
 
+    val actualWidth = width * zoom
     TranslationXDraggingItemDetector(
         modifier = Modifier
             .zIndex(if (flying) 1f else 0f),
@@ -357,10 +422,6 @@ fun Piece(
         onOffsetChange = onPiecesPaddingCompensationXChange,
         onDraggingInScopeChange = onDraggingInScopeChange
     ) { shouldPadding ->
-
-        var currentCompensation by remember { mutableFloatStateOf(0f) }
-        currentCompensation = piecesPaddingCompensationX + scrollingCompensationX - scrollingCompensationXRemoveProcess
-
         val screenWidth = LocalConfiguration.current.screenWidthDp
         val density = LocalDensity.current.density
         val centerX = screenWidth * density / 2
@@ -382,7 +443,7 @@ fun Piece(
                 val overScaleTarget = if(scale <= target) target + overScaleExtent else target - overScaleExtent
 
                 ValueAnimator.ofFloat(scale, overScaleTarget).apply {
-                    duration = 80
+                    duration = 100
                     addUpdateListener { animator ->
                         scale = animator.animatedValue as Float
 
@@ -411,7 +472,6 @@ fun Piece(
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(
                     onDragStart = {
-                        scrollingCompensationXRemoveProcess = 0f
                     },
                     onDrag = { _: PointerInputChange, dragAmount: Offset ->
                         draggingOffset += dragAmount
@@ -419,7 +479,7 @@ fun Piece(
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.UPDATE,
                             DraggingItem(
-                                position = currentRect.center + draggingOffset.let { it.copy(x = it.x + currentCompensation) },
+                                position = currentRect.center + offset.toOffset(),
                                 width = currentRect.width.toDp(),
                             )
                         )
