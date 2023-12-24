@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
@@ -72,6 +73,8 @@ fun Track(
 
     targetPosAnimationConcatenation: AnimationConcatenation?,
     onTargetPosAnimationConcatenationFinished: () -> Unit,
+
+    onBlankPieceWidthCalculated: (Int) -> Unit,
 ) {
     val draggingOffsetMap = remember { mutableMapOf<Int, MutableState<Offset>>() }
 
@@ -167,7 +170,9 @@ fun Track(
                             inScopePieceSet.remove(-1)
                             if(inScopePieceSet.isEmpty()) onInScopePiecesClear()
                         }
-                    })
+                    },
+                    onWidthCalculated = onBlankPieceWidthCalculated
+                )
             } else {
                 AddPieceButton {
                     requestAdding.invoke { result: List<SelectInfo> ->
@@ -188,7 +193,8 @@ fun BlankPiece(
     modifier: Modifier,
 
     draggingItem: DraggingItem?,
-    onDraggingInScopeChange: (Boolean) -> Unit
+    onDraggingInScopeChange: (Boolean) -> Unit,
+    onWidthCalculated: (Int) -> Unit
 ) {
     Box {
         var currentRect by remember { mutableStateOf(Rect.Zero) }
@@ -211,7 +217,7 @@ fun BlankPiece(
 
         val draggingItemLeft = draggingItem?.let { it.position.x / density - it.width.value / 2 }?.coerceAtLeast(0f)
         val blankPieceWidth = draggingItemLeft?.minus(currentRect.left / density)?.coerceAtLeast(0f) ?: 0f
-
+        onWidthCalculated.invoke(blankPieceWidth.roundToInt())
         AnimatedVisibility(
             enter = fadeIn(), exit = fadeOut(),
             visible = inScope
@@ -221,7 +227,6 @@ fun BlankPiece(
                     .alpha(0.99f)
                     .height(pieceHeight)
                     .width(blankPieceWidth.dp),
-                content = {}
             )
         }
     }

@@ -86,16 +86,18 @@ fun List<Track>.move(
         fun addNew() {
             val targetTrackIndex = targetPosition.first
             val targetPieceIndex = targetPosition.second
+
+            val preparingToAddPieces = if(precedingBlankPieceDuration != null && precedingBlankPieceDuration > 0) {
+                listOf(Piece(model = null, end = precedingBlankPieceDuration), piece)
+            } else listOf(piece)
+
             if(targetTrackIndex < 0 || targetTrackIndex >= size) {
-                val pieces = if(precedingBlankPieceDuration != null && precedingBlankPieceDuration > 0) {
-                    listOf(Piece(model = null, end = precedingBlankPieceDuration), piece)
-                } else listOf(piece)
-                add(Track(pieces = pieces))
+                add(Track(pieces = preparingToAddPieces))
             } else {
                 val newPieces = ArrayList(this[targetTrackIndex].pieces)
 
                 if (targetPieceIndex < 0 || targetPieceIndex >= size) {
-                    newPieces.add(piece)
+                    newPieces.addAll(preparingToAddPieces)
                 } else {
                     newPieces.add(targetPieceIndex, piece)
                 }
@@ -295,9 +297,9 @@ fun Control(
         var newTrackPrecedingPaddingDp by remember { mutableIntStateOf(0) }
 
         val totalDuration = tracks.longestDuration()
-        val latestTotalDuration = remember { mutableLongStateOf(totalDuration) }.apply { longValue = totalDuration }
+        val latestTotalDuration by remember { mutableLongStateOf(totalDuration) }.apply { longValue = totalDuration }
         val onTracksChangeInControl = { newTracks: List<Track> ->
-            val ltd = latestTotalDuration.longValue
+            val ltd = latestTotalDuration
             if(ltd > 0) zoom *= (newTracks.longestDuration() / ltd.toFloat())
 
             onTracksChange.invoke(newTracks)
@@ -351,12 +353,15 @@ fun Control(
                             currentDroppingTarget?.let { targetPos ->
                                 val initialPos = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex) }
                                 draggingEndPosition = draggingItem!!.position
+
+                                val rate = ((newTrackPrecedingPaddingDp / zoom) / maxTrackLengthDp)
+                                println("padding = $newTrackPrecedingPaddingDp zoom = $zoom rate = $rate  maxTrackLengthDp = $maxTrackLengthDp")
                                 onTracksChangeInControl.invoke(
                                     currentTracks.move(
                                         initialPos,
                                         targetPos,
                                         precedingBlankPieceDuration = if(newTrackPrecedingPaddingDp > 0) {
-                                            (totalDuration * (newTrackPrecedingPaddingDp / zoom) / maxTrackLengthDp.toFloat()).roundToLong()
+                                            (latestTotalDuration * rate).roundToLong()
                                         } else null
                                     ))
                                 animationConcatenation = AnimationConcatenation(
@@ -417,6 +422,9 @@ fun Control(
                         animationConcatenation = animationConcatenation?.copy(
                             targetPosition = null
                         )
+                    },
+                    onBlankPieceWidthCalculated = {
+                        newTrackPrecedingPaddingDp = it
                     }
                 )
             }
