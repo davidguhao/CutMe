@@ -270,6 +270,7 @@ fun Control(
     }
 
     var draggingItem by remember { mutableStateOf<DraggingItem?>(null) }
+    var lastNonNullDraggingItem by remember { mutableStateOf<DraggingItem?>(null) }
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var animationConcatenation by remember { mutableStateOf<AnimationConcatenation?>(null) }
 
@@ -380,15 +381,16 @@ fun Control(
                         }
 
                         draggingItem = item?.copy(trackIndex = trackIndex)
+                        draggingItem?.let { lastNonNullDraggingItem = it }
                     },
                     onDraggingInScope = { pieceIndex ->
                         Pair(trackIndex, pieceIndex).let { droppingTarget ->
                             currentDroppingTarget = droppingTarget
                             animationConcatenation = AnimationConcatenation(
-                                originalPosition = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
-                                shouldPaddingForOriginal = draggingItem!!.width.value.roundToInt(),
+                                originalPosition = lastNonNullDraggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
+                                shouldPaddingForOriginal = lastNonNullDraggingItem!!.width.value.roundToInt(),
 
-                                animationStartPositionForTarget = draggingItem!!.position,
+                                animationStartPositionForTarget = lastNonNullDraggingItem!!.position,
                                 targetPosition = droppingTarget)
                         }
 

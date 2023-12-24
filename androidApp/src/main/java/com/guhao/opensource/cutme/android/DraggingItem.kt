@@ -17,6 +17,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.animation.addListener
 import kotlin.math.abs
 
 data class DraggingItem(
@@ -119,7 +120,8 @@ fun TranslationXDraggingItemDetector(
         },
         onDraggingInScopeChange = { draggingInScope ->
 
-            onDraggingInScopeChange(draggingInScope)
+            if(!draggingInScope) onDraggingInScopeChange.invoke(false)
+
             val transTarget = if(draggingInScope) {
                 draggingItem!!.width.value
             } else 0f
@@ -130,6 +132,11 @@ fun TranslationXDraggingItemDetector(
                     translationXForDragDp = animator.animatedValue as Float
                     onOffsetChange.invoke(-translationXForDragDp * density)
                 }
+                addListener(
+                    onEnd = {
+                        if(draggingInScope) onDraggingInScopeChange.invoke(true)
+                    },
+                )
             }.start()
         },
         content = {
