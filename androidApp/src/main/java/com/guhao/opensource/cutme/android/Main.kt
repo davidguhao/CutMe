@@ -1,6 +1,5 @@
 package com.guhao.opensource.cutme.android
 
-import android.animation.TimeInterpolator
 import android.animation.TypeEvaluator
 import android.animation.ValueAnimator
 import android.view.animation.LinearInterpolator
@@ -19,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,10 +34,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.animation.addListener
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
@@ -63,12 +61,11 @@ fun DragPad(
     var dragging by remember { mutableStateOf(false) }
     val screenHeight = LocalConfiguration.current.screenHeightDp
 
-    val overScrollExtent = 20
+    val hitBackLength = 20
     val maxHeight = screenHeight - draggingIconHeight
 
-
     var draggingStartingTime by remember { mutableStateOf(System.currentTimeMillis()) }
-    var speed by remember { mutableStateOf(0f)}
+    var speed by remember { mutableFloatStateOf(0f) }
     Icon(
         imageVector = draggingIcon,
         contentDescription = "Drag man",
@@ -87,8 +84,11 @@ fun DragPad(
                         val diffInDp = (dragAmount.y / density).roundToInt()
 
                         val timeSpent = System.currentTimeMillis() - draggingStartingTime
-                        speed = diffInDp / timeSpent.toFloat()
-                        println("Current dragging speed: $speed")
+                        speed = if (timeSpent == 0L) 0f else (diffInDp / timeSpent.toFloat())
+                            .coerceAtMost(5f)
+                            .coerceAtLeast(-5f) // Dp per millisecond
+                        // I don't believe the value bigger than 5 is a normal one.
+//                        println("Current dragging speed: $speed")
                         draggingStartingTime = System.currentTimeMillis()
 
                         val current = targetHeight.invoke() + diffInDp
@@ -103,40 +103,57 @@ fun DragPad(
                     onDragEnd = {
                         dragging = false
 
-                        val threshold = 1
-                        if(abs(speed) > threshold) {
-                            val animateTargetValue = if(speed > 0) maxHeight else 0
-                            ValueAnimator.ofInt(targetHeight.invoke(), animateTargetValue).apply {
-                                duration = 500
-                                interpolator = TimeInterpolator { input -> input }
-                                setEvaluator(
-                                    TypeEvaluator<Int> { fraction, startValue, endValue ->
-                                        val len = endValue - startValue
+                        // Here I am expecting the speed will be changing from its original value
+                        // to 0 smoothly. But now I am really not sure where it will go.
+                        var startTime = System.currentTimeMillis()
 
+                        ValueAnimator.ofFloat(speed, 0f)
+                            .apply {
+                                duration = 800
+                                addUpdateListener {
+                                    val currentSpeed = it.animatedValue as Float
+                                    val timeDiff = System.currentTimeMillis() - startTime
 
-                                        startValue + (len * fraction).roundToInt()
+                                    val nextTargetHeight =
+                                        (targetHeight.invoke() + currentSpeed * timeDiff)
+                                            .roundToInt()
+                                            .coerceAtMost(maxHeight)
+                                            .coerceAtLeast(0)
+                                    onTargetHeightChange.invoke(nextTargetHeight)
+                                    startTime = System.currentTimeMillis() // update for next round
+
+                                    if (nextTargetHeight == 0 || nextTargetHeight == maxHeight) {
+                                        cancel()
+
+                                        // You hit back, the speed is the same but the direction changes
+                                        ValueAnimator
+                                            .ofFloat(-currentSpeed, 0f, currentSpeed)
+                                            .apply {
+                                                duration = 250
+                                                interpolator = LinearInterpolator()
+                                                addUpdateListener {
+                                                    val currentSpeed = it.animatedValue as Float
+                                                    val timeDiff =
+                                                        System.currentTimeMillis() - startTime
+
+                                                    val nextTargetHeight =
+                                                        (targetHeight.invoke() + currentSpeed * timeDiff)
+                                                            .roundToInt()
+                                                            .coerceAtMost(maxHeight)
+                                                            .coerceAtLeast(0)
+
+                                                    onTargetHeightChange.invoke(nextTargetHeight)
+
+                                                    startTime =
+                                                        System.currentTimeMillis() // update for next round
+                                                }
+                                            }
+                                            .start()
+
                                     }
-                                )
-                                addUpdateListener {
-                                    onTargetHeightChange.invoke(it.animatedValue as Int)
                                 }
-                            }.start()
-                        } else if(abs(speed) > threshold / 2) {
-                            ValueAnimator.ofInt(targetHeight.invoke(), targetHeight.invoke() + overScrollExtent * (if(speed > 0) 1 else -1)).apply {
-                                duration = 100
-                                addUpdateListener {
-                                    onTargetHeightChange.invoke(it.animatedValue as Int)
-                                }
-                                addListener(
-                                    onEnd = {
-                                        ValueAnimator.ofInt(targetHeight.invoke(), targetHeight.invoke() + overScrollExtent / 2 * (if(speed > 0) -1 else 1)).apply {
-                                            duration = 200
-                                            addUpdateListener { onTargetHeightChange.invoke(it.animatedValue as Int) }
-                                        }.start()
-                                    }
-                                )
-                            }.start()
-                        }
+                            }
+                            .start()
                     }
                 )
             }
