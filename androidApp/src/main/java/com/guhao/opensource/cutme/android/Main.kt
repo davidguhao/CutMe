@@ -1,5 +1,9 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.TimeInterpolator
+import android.animation.TypeEvaluator
+import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +34,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.animation.addListener
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class MainViewModel: ViewModel() {
@@ -57,6 +63,12 @@ fun DragPad(
     var dragging by remember { mutableStateOf(false) }
     val screenHeight = LocalConfiguration.current.screenHeightDp
 
+    val overScrollExtent = 20
+    val maxHeight = screenHeight - draggingIconHeight
+
+
+    var draggingStartingTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var speed by remember { mutableStateOf(0f)}
     Icon(
         imageVector = draggingIcon,
         contentDescription = "Drag man",
@@ -66,20 +78,65 @@ fun DragPad(
             .graphicsLayer(scaleX = 3f)
             .pointerInput(Unit) {
                 detectDragGestures(
+                    onDragStart = {
+                        dragging = true
+                        draggingStartingTime = System.currentTimeMillis()
+                    },
+
                     onDrag = { _: PointerInputChange, dragAmount: Offset ->
-                        val current = targetHeight.invoke() + (dragAmount.y / density).roundToInt()
-                        if (current <= screenHeight - draggingIconHeight) {
+                        val diffInDp = (dragAmount.y / density).roundToInt()
+
+                        val timeSpent = System.currentTimeMillis() - draggingStartingTime
+                        speed = diffInDp / timeSpent.toFloat()
+                        println("Current dragging speed: $speed")
+                        draggingStartingTime = System.currentTimeMillis()
+
+                        val current = targetHeight.invoke() + diffInDp
+                        if (current <= maxHeight) {
                             onTargetHeightChange(current)
                         }
                     },
-                    onDragStart = {
-                        dragging = true
-                    },
+
                     onDragCancel = {
                         dragging = false
                     },
                     onDragEnd = {
                         dragging = false
+
+                        val threshold = 1
+                        if(abs(speed) > threshold) {
+                            val animateTargetValue = if(speed > 0) maxHeight else 0
+                            ValueAnimator.ofInt(targetHeight.invoke(), animateTargetValue).apply {
+                                duration = 500
+                                interpolator = TimeInterpolator { input -> input }
+                                setEvaluator(
+                                    TypeEvaluator<Int> { fraction, startValue, endValue ->
+                                        val len = endValue - startValue
+
+
+                                        startValue + (len * fraction).roundToInt()
+                                    }
+                                )
+                                addUpdateListener {
+                                    onTargetHeightChange.invoke(it.animatedValue as Int)
+                                }
+                            }.start()
+                        } else if(abs(speed) > threshold / 2) {
+                            ValueAnimator.ofInt(targetHeight.invoke(), targetHeight.invoke() + overScrollExtent * (if(speed > 0) 1 else -1)).apply {
+                                duration = 100
+                                addUpdateListener {
+                                    onTargetHeightChange.invoke(it.animatedValue as Int)
+                                }
+                                addListener(
+                                    onEnd = {
+                                        ValueAnimator.ofInt(targetHeight.invoke(), targetHeight.invoke() + overScrollExtent / 2 * (if(speed > 0) -1 else 1)).apply {
+                                            duration = 200
+                                            addUpdateListener { onTargetHeightChange.invoke(it.animatedValue as Int) }
+                                        }.start()
+                                    }
+                                )
+                            }.start()
+                        }
                     }
                 )
             }
@@ -104,7 +161,9 @@ fun Main(vm: MainViewModel = MainViewModel()) {
                 onTargetHeightChange = { videoHeight = it })
             TextButton(
                 modifier = Modifier.align(Alignment.CenterEnd),
-                onClick = { /*TODO*/ }) {
+                onClick = {
+
+                }) {
                 Text(text = stringResource(id = R.string.build))
 
             }
