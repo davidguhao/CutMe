@@ -273,6 +273,7 @@ fun Control(
     var lastNonNullDraggingItem by remember { mutableStateOf<DraggingItem?>(null) }
     var currentDroppingTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var animationConcatenation by remember { mutableStateOf<AnimationConcatenation?>(null) }
+//    println("animationConcatenation: $animationConcatenation")
 
     val currentTracks by remember { mutableStateOf<List<Track>>(listOf()) }.also {
         it.value = tracks
@@ -356,7 +357,8 @@ fun Control(
                                 draggingEndPosition = draggingItem!!.position
 
                                 val rate = ((newTrackPrecedingPaddingDp / zoom) / maxTrackLengthDp)
-                                println("padding = $newTrackPrecedingPaddingDp zoom = $zoom rate = $rate  maxTrackLengthDp = $maxTrackLengthDp")
+//                                println("padding = $newTrackPrecedingPaddingDp zoom = $zoom rate = $rate  maxTrackLengthDp = $maxTrackLengthDp")
+//                                println("moving... $initialPos to $targetPos")
                                 onTracksChangeInControl.invoke(
                                     currentTracks.move(
                                         initialPos,
@@ -365,8 +367,13 @@ fun Control(
                                             (latestTotalDuration * rate).roundToLong()
                                         } else null
                                     ))
+
+                                // If dragging to previous one, we need padding animation for the index of (original position + 1).
+                                val draggingToPreviousItemPos =
+                                    targetPos.first == draggingItem!!.trackIndex && targetPos.second < draggingItem!!.pieceIndex
+
                                 animationConcatenation = AnimationConcatenation(
-                                    originalPosition = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
+                                    originalPosition = draggingItem!!.let { Pair(it.trackIndex, it.pieceIndex + if(draggingToPreviousItemPos) 1 else 0)},
                                     shouldPaddingForOriginal = draggingItem!!.width.value.roundToInt(),
 
                                     animationStartPositionForTarget = draggingItem!!.position,
@@ -376,7 +383,6 @@ fun Control(
 
                         if(reason == DraggingItemChangeReason.UPDATE && draggingItem == null && item != null) {
                             // Means created for the first time.
-
                             xPosOnDragItemCreated = horizontalScrollState.value
                         }
 
@@ -384,15 +390,8 @@ fun Control(
                         draggingItem?.let { lastNonNullDraggingItem = it }
                     },
                     onDraggingInScope = { pieceIndex ->
-                        Pair(trackIndex, pieceIndex).let { droppingTarget ->
-                            currentDroppingTarget = droppingTarget
-                            animationConcatenation = AnimationConcatenation(
-                                originalPosition = lastNonNullDraggingItem!!.let { Pair(it.trackIndex, it.pieceIndex)},
-                                shouldPaddingForOriginal = lastNonNullDraggingItem!!.width.value.roundToInt(),
-
-                                animationStartPositionForTarget = lastNonNullDraggingItem!!.position,
-                                targetPosition = droppingTarget)
-                        }
+                        currentDroppingTarget = Pair(trackIndex, pieceIndex)
+//                        println("dropping target changed - > $currentDroppingTarget")
 
                         inScopeTrackSet.add(trackIndex)
                     },
@@ -400,6 +399,7 @@ fun Control(
                         inScopeTrackSet.remove(trackIndex)
                         if(inScopeTrackSet.isEmpty()) {
                             currentDroppingTarget = null
+//                            println("dropping target changed - > $currentDroppingTarget")
                         }
                     },
                     hasDroppingTarget = { currentDroppingTarget != null },
@@ -420,7 +420,7 @@ fun Control(
                         )
                     },
                     targetPosAnimationConcatenation = if(animationConcatenation?.targetPosition?.first == trackIndex) animationConcatenation else null,
-                    onTargetPosAnimationConcatenationFinished = {
+                    onTargetPosAnimationConcatenationFinish = {
                         animationConcatenation = animationConcatenation?.copy(
                             targetPosition = null
                         )

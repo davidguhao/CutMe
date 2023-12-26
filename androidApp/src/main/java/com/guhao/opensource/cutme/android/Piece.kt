@@ -288,7 +288,7 @@ fun Piece(
     originalPosAnimationConcatenation: Int?,
     onOriginalPosAnimationConcatenationFinished: () -> Unit,
     targetPosAnimationConcatenation: Offset?,
-    onTargetPosAnimationConcatenationFinished: () -> Unit,
+    onTargetPosAnimationConcatenationFinish: () -> Unit,
 ) {
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
@@ -304,14 +304,16 @@ fun Piece(
 
     fun Offset.calCurrentOffset(): Offset {
         return if(currentRect.center != Offset.Zero) {
-            val x = this.x - currentRect.center.x
-            val y = this.y - currentRect.center.y
-            Offset(x = x, y = y)
+            Offset(
+                x = this.x - currentRect.center.x,
+                y = this.y - currentRect.center.y
+            )
         } else {
-            // So if we can't know its exact position, we just can't do anything on it...
+            // So if we can't know its accurate position, we just can't do anything on it...
             Offset.Zero
         }
     }
+
     if(targetPosAnimationConcatenation != null && draggingItem == null) {
         var currentAnimationConcatenation by remember { mutableStateOf<Offset?>(null) }
         if(currentAnimationConcatenation != targetPosAnimationConcatenation) {
@@ -320,7 +322,6 @@ fun Piece(
         }
 
         LaunchedEffect(key1 = targetPosAnimationConcatenation) {
-
             ValueAnimator.ofFloat(targetAnimationConcatenationOffset.x, 0f).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener {
@@ -329,10 +330,7 @@ fun Piece(
                 }
                 addListener(
                     onEnd = {
-                        onTargetPosAnimationConcatenationFinished.invoke()
-                    },
-                    onCancel = {
-                        onTargetPosAnimationConcatenationFinished.invoke()
+                        onTargetPosAnimationConcatenationFinish.invoke()
                     })
             }.start()
 
@@ -344,10 +342,7 @@ fun Piece(
                 }
                 addListener(
                     onEnd = {
-                        onTargetPosAnimationConcatenationFinished.invoke()
-                    },
-                    onCancel = {
-                        onTargetPosAnimationConcatenationFinished.invoke()
+                        onTargetPosAnimationConcatenationFinish.invoke()
                     })
             }.start()
 
@@ -356,11 +351,11 @@ fun Piece(
 
     var draggingOffset by draggingOffsetState
 
-    val totalCompensationX = piecesPaddingCompensationX + scrollingCompensationX
     var scrollingCompensationXRemoveProcess by remember { mutableIntStateOf(0) }
+    val totalCompensationXForDraggingItem = if(draggingOffset != Offset.Zero) piecesPaddingCompensationX + scrollingCompensationX - scrollingCompensationXRemoveProcess else 0f
     var offset by remember { mutableStateOf(IntOffset.Zero) }
     offset = IntOffset(
-        x = (targetAnimationConcatenationOffset.x + draggingOffset.x + totalCompensationX - scrollingCompensationXRemoveProcess).roundToInt(),
+        x = (targetAnimationConcatenationOffset.x + draggingOffset.x + totalCompensationXForDraggingItem).roundToInt(),
         y = (targetAnimationConcatenationOffset.y + draggingOffset.y).roundToInt()
     )
     val flying = offset != IntOffset.Zero
@@ -391,23 +386,12 @@ fun Piece(
                     onEnd = {
                         scrollingCompensationXRemoveProcess = 0
                     },
-                    onCancel = {
-                        scrollingCompensationXRemoveProcess = 0
-                    }
                 )
             }.start()
 
             ValueAnimator.ofFloat(draggingOffset.y, 0f).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
-                addListener(
-                    onEnd = {
-                        scrollingCompensationXRemoveProcess = 0
-                    },
-                    onCancel = {
-                        scrollingCompensationXRemoveProcess = 0
-                    }
-                )
             }.start()
         }
     }
@@ -419,11 +403,14 @@ fun Piece(
 
         draggingItem = draggingItem,
         enabled = enableDraggingDetector && !flying,
-        onOffsetChange = onPiecesPaddingCompensationXChange,
-        onDraggingInScopeChange = onDraggingInScopeChange
+        onDraggingInScopeChange = onDraggingInScopeChange,
     ) { shouldPadding ->
-        val screenWidth = LocalConfiguration.current.screenWidthDp
+
         val density = LocalDensity.current.density
+
+        onPiecesPaddingCompensationXChange.invoke(- shouldPadding.value * density)
+
+        val screenWidth = LocalConfiguration.current.screenWidthDp
         val centerX = screenWidth * density / 2
         val isProgressLineOver = currentRect.left < centerX && currentRect.right > centerX
 
@@ -434,7 +421,6 @@ fun Piece(
                     ScaleState.FLYING
             } else if(isProgressLineOver) ScaleState.ORIGINAL
             else if(selected) ScaleState.SELECTED else ScaleState.ORIGINAL
-
 
         var scale by remember { mutableFloatStateOf(1f) }
         LaunchedEffect(key1 = scaleState) {
@@ -476,10 +462,12 @@ fun Piece(
                     onDrag = { _: PointerInputChange, dragAmount: Offset ->
                         draggingOffset += dragAmount
 
+                        val draggingPos = currentRect.center + offset.toOffset()
+//                        println("Current dragging pos -> $draggingPos")
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.UPDATE,
                             DraggingItem(
-                                position = currentRect.center + offset.toOffset(),
+                                position = draggingPos,
                                 width = currentRect.width.toDp(),
                             )
                         )

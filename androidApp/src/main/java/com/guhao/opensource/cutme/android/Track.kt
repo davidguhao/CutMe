@@ -31,7 +31,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
@@ -72,7 +71,7 @@ fun Track(
     onOriginalPosAnimationConcatenationFinish: () -> Unit,
 
     targetPosAnimationConcatenation: AnimationConcatenation?,
-    onTargetPosAnimationConcatenationFinished: () -> Unit,
+    onTargetPosAnimationConcatenationFinish: () -> Unit,
 
     onBlankPieceWidthCalculated: (Int) -> Unit,
 ) {
@@ -99,7 +98,6 @@ fun Track(
             val pieceWidth = (maxTrackLengthDp * (piece.duration / totalDuration.toFloat())).roundToInt().dp
 
             val draggingOffsetState = remember { mutableStateOf(Offset.Zero) }.also { draggingOffsetMap[index] = it }
-            val draggingCausedFlying = draggingOffsetState.value != Offset.Zero
 
             Piece(
                 zoom = zoom,
@@ -124,8 +122,8 @@ fun Track(
                         null
                     } else index
                 },
-                scrollingCompensationX = if(draggingCausedFlying) scrollingCompensationX else 0,
-                piecesPaddingCompensationX = if(draggingCausedFlying) compensationMap.filter { it.first < index }.map { it.second }.sum() else 0f,
+                scrollingCompensationX = scrollingCompensationX,
+                piecesPaddingCompensationX = compensationMap.filter { it.first < index }.map { it.second }.sum(),
                 onPiecesPaddingCompensationXChange = { x ->
                     compensationMap.apply {
                         val ready = Pair(index, x)
@@ -153,7 +151,7 @@ fun Track(
                 originalPosAnimationConcatenation = if(originalPosAnimationConcatenation?.originalPosition?.second == index) originalPosAnimationConcatenation.shouldPaddingForOriginal else null,
                 onOriginalPosAnimationConcatenationFinished = onOriginalPosAnimationConcatenationFinish,
                 targetPosAnimationConcatenation = if(targetPosAnimationConcatenation?.targetPosition?.second == index) targetPosAnimationConcatenation.animationStartPositionForTarget else null,
-                onTargetPosAnimationConcatenationFinished = onTargetPosAnimationConcatenationFinished,
+                onTargetPosAnimationConcatenationFinish = onTargetPosAnimationConcatenationFinish,
             )
         }
 
@@ -217,7 +215,9 @@ fun BlankPiece(
 
         val draggingItemLeft = draggingItem?.let { it.position.x / density - it.width.value / 2 }?.coerceAtLeast(0f)
         val blankPieceWidth = draggingItemLeft?.minus(currentRect.left / density)?.coerceAtLeast(0f) ?: 0f
-        onWidthCalculated.invoke(blankPieceWidth.roundToInt())
+
+        if(inScope) onWidthCalculated.invoke(blankPieceWidth.roundToInt())
+
         AnimatedVisibility(
             enter = fadeIn(), exit = fadeOut(),
             visible = inScope

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.animation.addListener
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 data class DraggingItem(
     val position: Offset,
@@ -64,7 +66,7 @@ fun DraggingItemDetector(
         currentRect.center,
         currentRect.width,
         currentRect.height,
-    ) }?: false
+    ) } ?: false
     LaunchedEffect(key1 = draggingInScope) {
         onDraggingInScopeChange(draggingInScope)
     }
@@ -84,12 +86,12 @@ fun TranslationXDraggingItemDetector(
 
     draggingItem: DraggingItem?,
 
-    onOffsetChange: (Float) -> Unit = {},
     onDraggingInScopeChange: (Boolean) -> Unit,
 
     block: @Composable (Dp) -> Unit
 ) {
-    var translationXForDragDp by remember { mutableFloatStateOf(0f) }
+    var translationXForDragDp by remember { mutableIntStateOf(0) }
+    var translationXHitMaxValue by remember { mutableStateOf(false) }
     val density = LocalDensity.current.density
 
     fun isInScopeOffset(
@@ -102,6 +104,12 @@ fun TranslationXDraggingItemDetector(
     ): Boolean {
         return isInScope(
             randomPoint, center.copy(x = center.x - offset / 2), width + offset, height)
+    }
+
+    var latestInScope by remember { mutableStateOf(false) }
+
+    if(draggingItem == null && latestInScope && translationXHitMaxValue) { // Flash
+        translationXForDragDp = 0
     }
 
     DraggingItemDetector(
@@ -117,24 +125,27 @@ fun TranslationXDraggingItemDetector(
                 height = height,
                 offset = translationXForDragDp * density
             )
+
         },
         onDraggingInScopeChange = { draggingInScope ->
+            latestInScope = draggingInScope
 
-            if(!draggingInScope) onDraggingInScopeChange.invoke(false)
+            translationXHitMaxValue = false
+            onDraggingInScopeChange.invoke(false)
 
-            val transTarget = if(draggingInScope) {
-                draggingItem!!.width.value
-            } else 0f
+            val transTarget = if (draggingInScope) {
+                draggingItem!!.width.value.roundToInt()
+            } else 0
 
-            ValueAnimator.ofFloat(translationXForDragDp, transTarget).apply {
+            ValueAnimator.ofInt(translationXForDragDp, transTarget).apply {
                 duration = 250
                 addUpdateListener { animator ->
-                    translationXForDragDp = animator.animatedValue as Float
-                    onOffsetChange.invoke(-translationXForDragDp * density)
+                    translationXForDragDp = animator.animatedValue as Int
                 }
                 addListener(
                     onEnd = {
-                        if(draggingInScope) onDraggingInScopeChange.invoke(true)
+                        translationXHitMaxValue = true
+                        onDraggingInScopeChange.invoke(latestInScope)
                     },
                 )
             }.start()
