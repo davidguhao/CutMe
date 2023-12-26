@@ -1,25 +1,32 @@
 package com.guhao.opensource.cutme.android
 
-import android.animation.TypeEvaluator
 import android.animation.ValueAnimator
 import android.view.animation.LinearInterpolator
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,13 +43,53 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.delay
+import java.lang.Thread.sleep
 import kotlin.math.roundToInt
 
+
+class TracksHistoryRecorder {
+    private var currentHistoryPointer = -1
+    private var tracksHistory = MutableLiveData(listOf<List<Track>>())
+
+    fun record(tracks: List<Track>) {
+        if(currentHistoryPointer != tracksHistory.value!!.size - 1)
+            tracksHistory.value = tracksHistory.value!!.subList(0, currentHistoryPointer + 1)
+        tracksHistory.value = tracksHistory.value!! + listOf(tracks)
+        currentHistoryPointer ++
+    }
+    fun hasPreviousTracks(): Boolean {
+        return currentHistoryPointer - 1 >= 0
+    }
+    fun hasNextTracks(): Boolean {
+        return currentHistoryPointer + 1 < tracksHistory.value!!.size
+    }
+    fun next(): List<Track> {
+        return tracksHistory.value!![++currentHistoryPointer]
+    }
+    fun previous(): List<Track> {
+        return tracksHistory.value!![--currentHistoryPointer]
+    }
+}
 class MainViewModel: ViewModel() {
     val tracks = MutableLiveData(listOf(Track(listOf())))
+    private val tracksHistory: TracksHistoryRecorder = TracksHistoryRecorder()
+
     fun onTracksChange(new: List<Track>) {
         tracks.value = new
+
+        tracksHistory.record(new)
     }
+
+    fun hasPreviousTracks() = tracksHistory.hasPreviousTracks()
+    fun hasNextTracks() = tracksHistory.hasNextTracks()
+    fun goToPreviousTracks() {
+        tracks.value = tracksHistory.previous()
+    }
+    fun goToNextTracks() {
+        tracks.value = tracksHistory.next()
+    }
+
 
     var requestAdding: ((List<SelectInfo>) -> Unit) -> Unit = { throw UnsupportedOperationException() }
 }
@@ -61,7 +108,6 @@ fun DragPad(
     var dragging by remember { mutableStateOf(false) }
     val screenHeight = LocalConfiguration.current.screenHeightDp
 
-    val hitBackLength = 20
     val maxHeight = screenHeight - draggingIconHeight
 
     var draggingStartingTime by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -107,7 +153,8 @@ fun DragPad(
                         // to 0 smoothly. But now I am really not sure where it will go.
                         var startTime = System.currentTimeMillis()
 
-                        ValueAnimator.ofFloat(speed, 0f)
+                        ValueAnimator
+                            .ofFloat(speed, 0f)
                             .apply {
                                 duration = 800
                                 addUpdateListener {
@@ -163,9 +210,12 @@ fun DragPad(
 fun Main(vm: MainViewModel = MainViewModel()) {
     val screenHeight = LocalConfiguration.current.screenHeightDp
     var videoHeight by remember { mutableIntStateOf(screenHeight / 2) }
+
+
+    val controlState = rememberControlState()
+
     Column {
         val tracks by vm.tracks.observeAsState(listOf(Track(listOf())))
-        val controlState = rememberControlState()
 
         VideoScreen(
             modifier = Modifier.height(videoHeight.dp),
@@ -186,13 +236,72 @@ fun Main(vm: MainViewModel = MainViewModel()) {
             }
         }
 
-        Control(
-            modifier = Modifier.fillMaxHeight(),
-            tracks = tracks,
-            onTracksChange = vm::onTracksChange,
-            requestAdding = vm.requestAdding,
-            controlState = controlState,
+        Box {
+            var lastTimeTouchedControl by remember { mutableLongStateOf(0) }
+
+            Control(
+                modifier = Modifier.fillMaxHeight(),
+                tracks = tracks,
+                onTracksChange = vm::onTracksChange,
+                requestAdding = vm.requestAdding,
+                controlState = controlState,
+                onTouch = {
+                    lastTimeTouchedControl = System.currentTimeMillis()
+                })
+
+            TracksHistory(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 20.dp, end = 20.dp),
+
+                lastTimeTouchedControl = lastTimeTouchedControl,
+                hasPrevious = vm::hasPreviousTracks,
+                hasNext = vm::hasNextTracks,
+                goPrevious = vm::goToPreviousTracks,
+                goNext = vm::goToNextTracks,
             )
+        }
     }
 }
 
+@Composable
+fun TracksHistory(
+    modifier: Modifier,
+
+    lastTimeTouchedControl: Long,
+
+    hasPrevious: () -> Boolean,
+    hasNext: () -> Boolean,
+    goPrevious: () -> Unit,
+    goNext: () -> Unit
+) {
+    var historyVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(key1 = lastTimeTouchedControl) {
+        historyVisible = false
+        delay(1000)
+        historyVisible = true
+    }
+    AnimatedVisibility(modifier = modifier, visible = historyVisible) {
+        Row {
+            AnimatedVisibility(visible = hasPrevious.invoke()) {
+                IconButton(onClick = goPrevious) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        tint = Color.White,
+                        contentDescription = "Go previous")
+                }
+            }
+
+            AnimatedVisibility(visible = hasNext.invoke()) {
+                IconButton(onClick = goNext) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        tint = Color.White,
+
+                        contentDescription = "Go next",
+                        )
+                }
+            }
+        }
+    }
+}

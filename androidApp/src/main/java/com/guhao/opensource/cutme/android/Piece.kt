@@ -496,7 +496,7 @@ fun Piece(
                 alpha = 0.99f,
                 scaleX = scale,
                 scaleY = scale
-            )
+            ),
         ) {
             AnimatedContent(targetState = selected, label = "") { halfAlpha ->
                 Row(

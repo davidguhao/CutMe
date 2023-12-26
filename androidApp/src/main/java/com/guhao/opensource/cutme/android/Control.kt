@@ -262,8 +262,8 @@ fun Control(
 
     requestAdding: ((List<SelectInfo>) -> Unit) -> Unit,
     controlState: ControlState = rememberControlState(),
+    onTouch: () -> Unit,
 ) {
-
     var selectedPiecesSet by remember { mutableStateOf(setOf<Piece>()) }
     BackHandler(enabled = selectedPiecesSet.isNotEmpty()) {
         selectedPiecesSet = setOf()
@@ -283,6 +283,7 @@ fun Control(
         modifier = modifier,
         onTouch = {
             controlState.focusOn = true
+            onTouch.invoke()
         },
         zoom = { zoom },
         onZoomChange = { zoom = it }
