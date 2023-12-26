@@ -441,7 +441,7 @@ fun Control(
                         .coerceAtLeast(0)
                 }
                 val blankPieceWidthDp = draggingItem?.let { calWidth(it) } ?: 0
-                newTrackPrecedingPaddingDp = blankPieceWidthDp
+                if(inScope) newTrackPrecedingPaddingDp = blankPieceWidthDp
                 Box {
                     AnimatedVisibility(
                         visible = inScope,
