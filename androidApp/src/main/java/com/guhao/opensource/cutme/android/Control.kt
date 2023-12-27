@@ -443,7 +443,7 @@ fun Control(
                 }
                 val blankPieceWidthDp = draggingItem?.let { calWidth(it) } ?: 0
                 if(inScope) newTrackPrecedingPaddingDp = blankPieceWidthDp
-                Box {
+                Box(modifier = Modifier.padding(vertical = 10.dp)) {
                     AnimatedVisibility(
                         visible = inScope,
                         enter = fadeIn(), exit = fadeOut()

@@ -1,11 +1,11 @@
 package com.guhao.opensource.cutme.android
 
 import android.animation.ValueAnimator
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +44,10 @@ fun isInScope(
     return xInScope && yInScope
 }
 
+
+const val DETECTOR_DEBUG_MODE = false
+val DETECTOR_DEBUG_MODE_COLOR = Color(0x44ffffff)
+
 @Composable
 fun DraggingItemDetector(
     modifier: Modifier = Modifier,
@@ -56,6 +61,8 @@ fun DraggingItemDetector(
         width: Float,
         height: Float) -> Boolean = ::isInScope,
     onDraggingInScopeChange: (Boolean) -> Unit,
+
+    debugMode: Boolean = DETECTOR_DEBUG_MODE,
 
     content: @Composable () -> Unit = {}
 ) {
@@ -71,7 +78,13 @@ fun DraggingItemDetector(
         onDraggingInScopeChange(draggingInScope)
     }
 
-    Box(modifier = modifier.onGloballyPositioned { layoutCoordinates ->
+    val effectiveModifier = if(debugMode)
+        modifier.background(color = DETECTOR_DEBUG_MODE_COLOR)
+    else
+        modifier
+
+    Box(modifier = effectiveModifier
+        .onGloballyPositioned { layoutCoordinates ->
         currentRect = layoutCoordinates.boundsInWindow()
     }) {
         content.invoke()

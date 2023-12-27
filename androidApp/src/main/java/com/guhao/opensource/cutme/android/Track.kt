@@ -85,6 +85,7 @@ fun Track(
 
     Box(modifier = Modifier
         .zIndex(if (gotPieceFlyingInThisTrack) 1f else 0f)) {
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -211,10 +212,10 @@ fun Track(
         val detectorWidth = screenWidthDp + maxTrackLengthDp * zoom
         DraggingItemDetector(
             modifier = Modifier
-                .width(detectorWidth.dp)
-                .height(pieceHeight)
                 .padding(vertical = 10.dp)
-            ,
+
+                .width(detectorWidth.dp)
+                .height(pieceHeight),
             draggingItem = draggingItem,
             onDraggingInScopeChange = {
                 inScope = it
