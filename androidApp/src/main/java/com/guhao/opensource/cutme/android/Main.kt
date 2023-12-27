@@ -84,10 +84,10 @@ class MainViewModel: ViewModel() {
     fun hasPreviousTracks() = tracksHistory.hasPreviousTracks()
     fun hasNextTracks() = tracksHistory.hasNextTracks()
     fun goToPreviousTracks() {
-        tracks.value = tracksHistory.previous()
+        if(hasPreviousTracks()) tracks.value = tracksHistory.previous()
     }
     fun goToNextTracks() {
-        tracks.value = tracksHistory.next()
+        if(hasNextTracks()) tracks.value = tracksHistory.next()
     }
 
 
