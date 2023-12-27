@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
@@ -455,12 +459,12 @@ fun Piece(
             .pointerInput(Unit) {
                 dragGesturesAfterLongPress(
                     onDragStart = {
+
                     },
                     onDrag = { _: PointerInputChange, dragAmount: Offset ->
                         draggingOffset += dragAmount
 
                         val draggingPos = currentRect.center + offset.toOffset()
-//                        println("Current dragging pos -> $draggingPos")
                         onDraggingItemChange.invoke(
                             DraggingItemChangeReason.UPDATE,
                             DraggingItem(
@@ -513,17 +517,30 @@ fun Piece(
                     val expectingWidthForEachFrame = 40
                     val nFrameShouldShow = (actualWidth.value / expectingWidthForEachFrame).toInt().let { if(it == 0) 1 else it}
 
-                    for(i in 0 until nFrameShouldShow) GlideImage(
-                        modifier = Modifier
-                            .height(pieceHeight)
-                            .width(actualWidth / nFrameShouldShow),
-                        contentScale = ContentScale.Crop,
-                        model = piece.model,
-                        contentDescription = "",
-                        requestBuilderTransform = {
-                            it.frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
+                    for(i in 0 until nFrameShouldShow) {
+                        if(piece.model != null) {
+                            GlideImage(
+                                modifier = Modifier
+                                    .height(pieceHeight)
+                                    .width(actualWidth / nFrameShouldShow),
+                                contentScale = ContentScale.Crop,
+                                model = piece.model,
+                                contentDescription = "",
+                                requestBuilderTransform = {
+                                    it.frame((piece.start + piece.duration / nFrameShouldShow * i) * 1000)
+                                }
+                            )
+                        } else {
+                            Icon(
+                                modifier = Modifier.height(pieceHeight)
+                                    .graphicsLayer(rotationZ = 45f)
+                                    .width(actualWidth / nFrameShouldShow),
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Blank piece",
+                                tint = Color.White
+                            )
                         }
-                    )
+                    }
                 }
 
             }
