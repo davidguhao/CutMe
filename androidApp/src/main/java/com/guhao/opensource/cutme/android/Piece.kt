@@ -236,13 +236,13 @@ fun OriginalPosAnimation(
     onAnimationFinish: () -> Unit
 ) {
     if(originalPosAnimationConcatenation != null && draggingItem == null) {
-        var currentAnimationConcatenation by remember { mutableStateOf<Int?>(null) }
-        if(currentAnimationConcatenation != originalPosAnimationConcatenation) {
-            onPaddingChange.invoke(originalPosAnimationConcatenation) // Flash to the starting point!
-            currentAnimationConcatenation = originalPosAnimationConcatenation
+        val current = remember(key1 = originalPosAnimationConcatenation) {
+            originalPosAnimationConcatenation.also {
+                onPaddingChange.invoke(it) // Flash to the starting point!
+            }
         }
-        LaunchedEffect(key1 = originalPosAnimationConcatenation) {
-            ValueAnimator.ofInt(originalPosAnimationConcatenation, 0).apply {
+        LaunchedEffect(key1 = current) {
+            ValueAnimator.ofInt(current, 0).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener {
                     onPaddingChange.invoke(it.animatedValue as Int)
@@ -286,7 +286,7 @@ fun Piece(
     hasDroppingTarget: () -> Boolean,
 
     originalPosAnimationConcatenation: Int?,
-    onOriginalPosAnimationConcatenationFinished: () -> Unit,
+    onOriginalPosAnimationConcatenationFinish: () -> Unit,
     targetPosAnimationConcatenation: Offset?,
     onTargetPosAnimationConcatenationFinish: () -> Unit,
 ) {
@@ -297,16 +297,16 @@ fun Piece(
         originalPosAnimationConcatenation = originalPosAnimationConcatenation,
         onPaddingChange = { originalAnimationConcatenationPadding = it },
         draggingItem = draggingItem,
-        onAnimationFinish = onOriginalPosAnimationConcatenationFinished
+        onAnimationFinish = onOriginalPosAnimationConcatenationFinish
     )
 
     var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
 
-    fun Offset.calCurrentOffset(): Offset {
-        return if(currentRect.center != Offset.Zero) {
+    fun Offset.calCurrentOffset(center: Offset): Offset {
+        return if(center != Offset.Zero) {
             Offset(
-                x = this.x - currentRect.center.x,
-                y = this.y - currentRect.center.y
+                x = this.x - center.x,
+                y = this.y - center.y
             )
         } else {
             // So if we can't know its accurate position, we just can't do anything on it...
@@ -315,14 +315,14 @@ fun Piece(
     }
 
     if(targetPosAnimationConcatenation != null && draggingItem == null) {
-        var currentAnimationConcatenation by remember { mutableStateOf<Offset?>(null) }
-        if(currentAnimationConcatenation != targetPosAnimationConcatenation) {
-            targetAnimationConcatenationOffset = targetPosAnimationConcatenation.calCurrentOffset() // Flash to the starting point!
-            currentAnimationConcatenation = targetPosAnimationConcatenation // Save it
+        val currentOffset = remember(key1 = targetPosAnimationConcatenation, key2 = currentRect) {
+            targetPosAnimationConcatenation.calCurrentOffset(currentRect.center).also {
+                targetAnimationConcatenationOffset = it // Flash to the position
+            }
         }
 
-        LaunchedEffect(key1 = targetPosAnimationConcatenation) {
-            ValueAnimator.ofFloat(targetAnimationConcatenationOffset.x, 0f).apply {
+        LaunchedEffect(key1 = currentOffset) {
+            ValueAnimator.ofFloat(currentOffset.x, 0f).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener {
                     targetAnimationConcatenationOffset =
@@ -334,7 +334,7 @@ fun Piece(
                     })
             }.start()
 
-            ValueAnimator.ofFloat(targetAnimationConcatenationOffset.y, 0f).apply {
+            ValueAnimator.ofFloat(currentOffset.y, 0f).apply {
                 duration = ANIMATION_DURATION
                 addUpdateListener {
                     targetAnimationConcatenationOffset =

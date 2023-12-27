@@ -157,7 +157,7 @@ fun Track(
                     hasDroppingTarget = hasDroppingTarget,
 
                     originalPosAnimationConcatenation = if (originalPosAnimationConcatenation?.originalPosition?.second == index) originalPosAnimationConcatenation.shouldPaddingForOriginal else null,
-                    onOriginalPosAnimationConcatenationFinished = onOriginalPosAnimationConcatenationFinish,
+                    onOriginalPosAnimationConcatenationFinish = onOriginalPosAnimationConcatenationFinish,
                     targetPosAnimationConcatenation = if (targetPosAnimationConcatenation?.targetPosition?.second == index) targetPosAnimationConcatenation.animationStartPositionForTarget else null,
                     onTargetPosAnimationConcatenationFinish = onTargetPosAnimationConcatenationFinish,
                 )
