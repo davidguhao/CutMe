@@ -432,15 +432,15 @@ fun Piece(
                     duration = 100
                     addUpdateListener { animator ->
                         scale = animator.animatedValue as Float
-
-                        // About end
-                        if(scale - overScaleTarget < 0.01f) {
+                    }
+                    addListener(
+                        onEnd = {
                             ValueAnimator.ofFloat(scale, target).apply {
                                 duration = 70
                                 addUpdateListener { scale = it.animatedValue as Float }
                             }.start()
                         }
-                    }
+                    )
                 }.start()
             }
 
