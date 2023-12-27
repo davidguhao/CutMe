@@ -1,5 +1,6 @@
 package com.guhao.opensource.cutme.android
 
+import android.animation.TypeEvaluator
 import android.animation.ValueAnimator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -228,7 +229,7 @@ enum class ScaleState {
 const val ANIMATION_DURATION = 250L // In milliseconds
 
 @Composable
-fun OriginalPosAnimation(
+fun OriginalPosConcatAnimation(
     originalPosAnimationConcatenation: Int?,
     onPaddingChange: (Int) -> Unit,
     draggingItem: DraggingItem?,
@@ -255,6 +256,49 @@ fun OriginalPosAnimation(
                         onAnimationFinish.invoke()
                     }
                 )
+            }.start()
+        }
+    }
+}
+
+@Composable
+fun TargetPosConcatAnimation(
+    targetPosAnimationConcatenation: Offset?,
+    currentRect: Rect,
+    draggingItem: DraggingItem?,
+    onOffsetChange: (Offset) -> Unit,
+    onAnimationFinish: () -> Unit
+) {
+    fun Offset.calCurrentOffset(center: Offset): Offset {
+        return if(center != Offset.Zero) {
+            Offset(
+                x = this.x - center.x,
+                y = this.y - center.y
+            )
+        } else {
+            // So if we can't know its accurate position, we just can't do anything on it...
+            Offset.Zero
+        }
+    }
+
+    if(targetPosAnimationConcatenation != null && draggingItem == null) {
+        val currentOffset = remember(key1 = targetPosAnimationConcatenation, key2 = currentRect) {
+            targetPosAnimationConcatenation.calCurrentOffset(currentRect.center).also {
+                onOffsetChange.invoke(it)
+            }
+        }
+
+        LaunchedEffect(key1 = currentOffset) {
+            ValueAnimator.ofObject(OffsetValueAnimatorEvaluator(),
+                currentOffset, Offset.Zero).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    onOffsetChange.invoke(it.animatedValue as Offset)
+                }
+                addListener(
+                    onEnd = {
+                        onAnimationFinish.invoke()
+                    })
             }.start()
         }
     }
@@ -293,7 +337,7 @@ fun Piece(
     var currentRect by remember { mutableStateOf(Rect.Zero) }
 
     var originalAnimationConcatenationPadding by remember { mutableIntStateOf(0) }
-    OriginalPosAnimation(
+    OriginalPosConcatAnimation(
         originalPosAnimationConcatenation = originalPosAnimationConcatenation,
         onPaddingChange = { originalAnimationConcatenationPadding = it },
         draggingItem = draggingItem,
@@ -301,53 +345,13 @@ fun Piece(
     )
 
     var targetAnimationConcatenationOffset by remember { mutableStateOf(Offset.Zero) }
-
-    fun Offset.calCurrentOffset(center: Offset): Offset {
-        return if(center != Offset.Zero) {
-            Offset(
-                x = this.x - center.x,
-                y = this.y - center.y
-            )
-        } else {
-            // So if we can't know its accurate position, we just can't do anything on it...
-            Offset.Zero
-        }
-    }
-
-    if(targetPosAnimationConcatenation != null && draggingItem == null) {
-        val currentOffset = remember(key1 = targetPosAnimationConcatenation, key2 = currentRect) {
-            targetPosAnimationConcatenation.calCurrentOffset(currentRect.center).also {
-                targetAnimationConcatenationOffset = it // Flash to the position
-            }
-        }
-
-        LaunchedEffect(key1 = currentOffset) {
-            ValueAnimator.ofFloat(currentOffset.x, 0f).apply {
-                duration = ANIMATION_DURATION
-                addUpdateListener {
-                    targetAnimationConcatenationOffset =
-                        targetAnimationConcatenationOffset.copy(x = it.animatedValue as Float)
-                }
-                addListener(
-                    onEnd = {
-                        onTargetPosAnimationConcatenationFinish.invoke()
-                    })
-            }.start()
-
-            ValueAnimator.ofFloat(currentOffset.y, 0f).apply {
-                duration = ANIMATION_DURATION
-                addUpdateListener {
-                    targetAnimationConcatenationOffset =
-                        targetAnimationConcatenationOffset.copy(y = it.animatedValue as Float)
-                }
-                addListener(
-                    onEnd = {
-                        onTargetPosAnimationConcatenationFinish.invoke()
-                    })
-            }.start()
-
-        }
-    }
+    TargetPosConcatAnimation(
+        targetPosAnimationConcatenation = targetPosAnimationConcatenation,
+        currentRect = currentRect,
+        draggingItem = draggingItem,
+        onOffsetChange = { targetAnimationConcatenationOffset = it },
+        onAnimationFinish = onTargetPosAnimationConcatenationFinish
+    )
 
     var draggingOffset by draggingOffsetState
 
@@ -367,15 +371,13 @@ fun Piece(
         if(hasDroppingTarget.invoke()) {
             draggingOffset = Offset.Zero // Flash back
         } else {
-            ValueAnimator
-                .ofFloat(draggingOffset.x, 0f)
-                .apply {
-                    duration = ANIMATION_DURATION
-                    addUpdateListener {
-                        draggingOffset = draggingOffset.copy(x = it.animatedValue as Float)
-                    }
+            ValueAnimator.ofObject(OffsetValueAnimatorEvaluator(),
+                draggingOffset, Offset.Zero).apply {
+                duration = ANIMATION_DURATION
+                addUpdateListener {
+                    draggingOffset = it.animatedValue as Offset
                 }
-                .start()
+            }.start()
 
             if(latestScrollingCompensationX > 0) ValueAnimator.ofInt(scrollingCompensationXRemoveProcess, latestScrollingCompensationX).apply {
                 duration = ANIMATION_DURATION
@@ -387,11 +389,6 @@ fun Piece(
                         scrollingCompensationXRemoveProcess = 0
                     },
                 )
-            }.start()
-
-            ValueAnimator.ofFloat(draggingOffset.y, 0f).apply {
-                duration = ANIMATION_DURATION
-                addUpdateListener { draggingOffset = draggingOffset.copy(y = it.animatedValue as Float) }
             }.start()
         }
     }
